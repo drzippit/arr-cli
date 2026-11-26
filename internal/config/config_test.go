@@ -89,11 +89,6 @@ func TestLoadRejectsInvalidInstances(t *testing.T) {
 			wantErr: "duplicate",
 		},
 		{
-			name:    "name clashes with a top-level command",
-			body:    "[[instance]]\nname = \"status\"\napp = \"sonarr\"\nurl = \"http://x\"\napi_key = \"k\"\n",
-			wantErr: "reserved",
-		},
-		{
 			name:    "malformed toml",
 			body:    "[[instance]\n",
 			wantErr: "parse",
@@ -165,5 +160,21 @@ func TestPathDefaultsToUserConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	if got, want := config.Path(), "/home/tester/.config/arr-cli/config.toml"; got != want {
 		t.Errorf("Path() = %q, want %q", got, want)
+	}
+}
+
+func TestLoadRejectsInstanceNamedAfterTopLevelCommand(t *testing.T) {
+	for _, name := range []string{"status", "queue", "calendar", "config", "help", "completion"} {
+		t.Run(name, func(t *testing.T) {
+			body := "[[instance]]\nname = \"" + name + "\"\napp = \"sonarr\"\nurl = \"http://x\"\napi_key = \"k\"\n"
+			_, err := config.Load(writeConfig(t, body))
+			if err == nil {
+				t.Fatalf("Load accepted an Instance named %q", name)
+			}
+			want := `instance "` + name + `" clashes with the top-level command "arr ` + name + `"`
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q does not contain %q", err, want)
+			}
+		})
 	}
 }

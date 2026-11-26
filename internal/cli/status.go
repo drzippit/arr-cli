@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -24,22 +25,36 @@ type statusRecord struct {
 	Health    []arrapi.HealthCheck `json:"health,omitempty"`
 }
 
-func newStatusCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
+// newStatusCmd builds a status command for the given Instances: one for
+// `arr <instance> status`, or all of them for `arr status`.
+func newStatusCmd(insts []config.Instance, flags *globalFlags) *cobra.Command {
 	var verbose bool
 	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Show whether the Instance is reachable, its version and its health warnings",
+		Short: "Show whether each Instance is reachable, its version and its Warnings",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			recs := []statusRecord{fetchStatus(cmd.Context(), inst)}
+			recs := fetchStatusAll(cmd.Context(), insts)
 			if err := renderStatus(cmd.OutOrStdout(), recs, verbose, flags.json); err != nil {
 				return err
 			}
 			return reportFailures(cmd.ErrOrStderr(), recs)
 		},
 	}
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "list each health warning")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "list each Warning")
 	return cmd
+}
+
+// fetchStatusAll asks every Instance at the same time and returns their
+// records in config order.
+func fetchStatusAll(ctx context.Context, insts []config.Instance) []statusRecord {
+	recs := make([]statusRecord, len(insts))
+	var wg sync.WaitGroup
+	for i, inst := range insts {
+		wg.Go(func() { recs[i] = fetchStatus(ctx, inst) })
+	}
+	wg.Wait()
+	return recs
 }
 
 func fetchStatus(ctx context.Context, inst config.Instance) statusRecord {

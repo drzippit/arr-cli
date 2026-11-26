@@ -34,8 +34,10 @@ var Apps = []App{Sonarr, Radarr}
 func (a App) Valid() bool { return slices.Contains(Apps, a) }
 
 // ReservedNames are top-level command names. An Instance may not use one,
-// because Instance names share the command namespace (ADR 0002).
-var ReservedNames = []string{"status", "queue", "help", "completion"}
+// because Instance names share the command namespace (ADR 0002). The list
+// includes planned commands (queue, calendar, config) so a config that works
+// today keeps working when they land.
+var ReservedNames = []string{"status", "queue", "calendar", "config", "help", "completion"}
 
 // Config is the parsed config file.
 type Config struct {
@@ -95,7 +97,7 @@ func (c *Config) validate() error {
 		}
 		seen[inst.Name] = true
 		if slices.Contains(ReservedNames, inst.Name) {
-			return fmt.Errorf("instance %q: name is reserved for a top-level command", inst.Name)
+			return fmt.Errorf("instance %q clashes with the top-level command \"arr %s\"; choose another name", inst.Name, inst.Name)
 		}
 		if !inst.App.Valid() {
 			return fmt.Errorf("instance %q: app %q is not one of %v", inst.Name, inst.App, Apps)
