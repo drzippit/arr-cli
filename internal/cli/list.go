@@ -35,22 +35,24 @@ type libraryRecord struct {
 	sortTitle string
 }
 
-// newListCmd builds `arr <instance> list [query]` for inst. A query of several
-// words may be quoted or not. Unlike other read commands there is no
-// `arr list` across every Instance (ADR 0002), since a whole Library is long
-// and is looked at one Instance at a time.
-func newListCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
+// newListCmd builds a list command for the Instances that instances returns:
+// one for `arr <instance> list`, or all of them for `arr list`. A query of
+// several words may be quoted or not.
+func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list [query]",
-		Short: "Show the Titles in the Instance's Library, optionally only those matching query",
+		Short: "Show the Titles in each Instance's Library, optionally only those matching query",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			res := fetchLibrary(cmd.Context(), inst)
-			if res.err != nil {
-				return fmt.Errorf("%s: %w", inst.Name, res.err)
+			insts, err := instances()
+			if err != nil {
+				return err
 			}
-			recs := titlesMatching(res.recs, strings.Join(args, " "))
-			slices.SortStableFunc(recs, func(a, b libraryRecord) int { return cmp.Compare(a.sortTitle, b.sortTitle) })
-			return renderLibrary(cmd.OutOrStdout(), recs, flags.json)
+			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchLibrary))
+			recs = titlesMatching(recs, strings.Join(args, " "))
+			if err := renderLibrary(cmd.OutOrStdout(), recs, flags.json); err != nil {
+				return err
+			}
+			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
 }
@@ -80,6 +82,7 @@ func fetchLibrary(ctx context.Context, inst config.Instance) instanceResult[libr
 			recs = append(recs, movieRecord(inst, m))
 		}
 	}
+	slices.SortStableFunc(recs, func(a, b libraryRecord) int { return cmp.Compare(a.sortTitle, b.sortTitle) })
 	return instanceResult[libraryRecord]{recs: recs}
 }
 
@@ -139,10 +142,10 @@ func renderLibrary(w io.Writer, recs []libraryRecord, asJSON bool) error {
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
 		rows = append(rows, []string{
-			r.displayTitle(), orDash(r.Status), yesNo(r.Monitored), r.displayFiles(), formatSize(r.SizeOnDisk),
+			r.Instance, r.displayTitle(), orDash(r.Status), yesNo(r.Monitored), r.displayFiles(), formatSize(r.SizeOnDisk),
 		})
 	}
-	return renderTable(w, []string{"TITLE", "STATUS", "MONITORED", "FILES", "SIZE"}, rows)
+	return renderTable(w, []string{"INSTANCE", "TITLE", "STATUS", "MONITORED", "FILES", "SIZE"}, rows)
 }
 
 // displayFiles says how many of a Series' episodes are on disk, or whether a
