@@ -129,6 +129,7 @@ func TestStatusJSONIsOneFlatArrayAcrossInstances(t *testing.T) {
     "app": "sonarr",
     "reachable": true,
     "version": "4.0.11.2680",
+    "supported": true,
     "warnings": 2
   },
   {
@@ -136,6 +137,7 @@ func TestStatusJSONIsOneFlatArrayAcrossInstances(t *testing.T) {
     "app": "radarr",
     "reachable": true,
     "version": "5.14.0.9383",
+    "supported": true,
     "warnings": 0
   }
 ]

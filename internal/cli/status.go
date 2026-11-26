@@ -12,12 +12,14 @@ import (
 	"github.com/drzippit/arr-cli/internal/config"
 )
 
-// statusRecord is the status of one Instance.
+// statusRecord is the status of one Instance. Supported says whether
+// arr-cli supports its version, once that is known.
 type statusRecord struct {
 	Instance  string               `json:"instance"`
 	App       config.App           `json:"app"`
 	Reachable bool                 `json:"reachable"`
 	Version   string               `json:"version"`
+	Supported *bool                `json:"supported,omitempty"`
 	Warnings  *int                 `json:"warnings"`
 	Error     string               `json:"error,omitempty"`
 	Health    []arrapi.HealthCheck `json:"health,omitempty"`
@@ -69,6 +71,8 @@ func fetchStatus(ctx context.Context, inst config.Instance) statusRecord {
 	}
 	rec.Reachable = true
 	rec.Version = sys.Version
+	supported := supportedVersion(inst.App, sys.Version)
+	rec.Supported = &supported
 	health, err := client.Health(ctx)
 	if err != nil {
 		return rec.failed(err)
@@ -111,7 +115,7 @@ func renderStatus(w io.Writer, recs []statusRecord, verbose, asJSON bool) error 
 	rows := make([][]string, 0, len(recs))
 	var warnings [][]string
 	for _, r := range recs {
-		rows = append(rows, []string{r.Instance, string(r.App), yesNo(r.Reachable), r.Version, countOrDash(r.Warnings)})
+		rows = append(rows, []string{r.Instance, string(r.App), yesNo(r.Reachable), r.displayVersion(), countOrDash(r.Warnings)})
 		for _, h := range r.Health {
 			warnings = append(warnings, []string{r.Instance, h.Type, h.Source, h.Message})
 		}
@@ -137,4 +141,12 @@ func countOrDash(n *int) string {
 		return "-"
 	}
 	return strconv.Itoa(*n)
+}
+
+// displayVersion gives the version, marked when arr-cli does not support it.
+func (r statusRecord) displayVersion() string {
+	if r.Supported != nil && !*r.Supported {
+		return r.Version + " (unsupported)"
+	}
+	return r.Version
 }
