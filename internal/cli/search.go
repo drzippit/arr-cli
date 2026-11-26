@@ -100,12 +100,7 @@ func movieCandidate(inst config.Instance, m arrapi.Movie) candidateRecord {
 func renderCandidates(w io.Writer, app config.App, recs []candidateRecord) error {
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
-		library := ""
-		if r.InLibrary {
-			library = "✓ in library"
-		}
-		// A Candidate carries only one of the two IDs; the other is 0.
-		rows = append(rows, []string{titleWithYear(r.Title, r.Year), idOrDash(r.TvdbID + r.TmdbID), library})
+		rows = append(rows, []string{r.displayTitle(), r.displayID(), r.libraryMark()})
 	}
 	return renderTable(w, []string{"TITLE", idLabel(app), "LIBRARY"}, rows)
 }
@@ -117,6 +112,20 @@ func idLabel(app config.App) string {
 		return "TMDB"
 	}
 	return "TVDB"
+}
+
+func (r candidateRecord) displayTitle() string { return titleWithYear(r.Title, r.Year) }
+
+// displayID gives the Candidate's TVDB or TMDB ID; it carries only one of the
+// two, and the other is 0.
+func (r candidateRecord) displayID() string { return idOrDash(r.TvdbID + r.TmdbID) }
+
+// libraryMark marks a Candidate already in the Library.
+func (r candidateRecord) libraryMark() string {
+	if r.InLibrary {
+		return "✓ in library"
+	}
+	return ""
 }
 
 func idOrDash(id int) string {

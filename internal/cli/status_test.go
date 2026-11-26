@@ -29,14 +29,16 @@ func fakeInstance(t *testing.T, app string) *httptest.Server {
 func recordedHandler(t *testing.T, app string) http.Handler {
 	t.Helper()
 	routes := map[string]string{
-		"/api/v3/system/status": "system_status.json",
-		"/api/v3/health":        "health.json",
-		"/api/v3/queue":         "queue.json",
-		"/api/v3/calendar":      "calendar.json",
-		"/api/v3/series":        "series.json",
-		"/api/v3/movie":         "movie.json",
-		"/api/v3/series/lookup": "series_lookup.json",
-		"/api/v3/movie/lookup":  "movie_lookup.json",
+		"/api/v3/system/status":  "system_status.json",
+		"/api/v3/health":         "health.json",
+		"/api/v3/queue":          "queue.json",
+		"/api/v3/calendar":       "calendar.json",
+		"/api/v3/series":         "series.json",
+		"/api/v3/movie":          "movie.json",
+		"/api/v3/series/lookup":  "series_lookup.json",
+		"/api/v3/movie/lookup":   "movie_lookup.json",
+		"/api/v3/qualityprofile": "qualityprofile.json",
+		"/api/v3/rootfolder":     "rootfolder.json",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Api-Key") != testAPIKey {
@@ -71,8 +73,14 @@ func useConfig(t *testing.T, defs ...instanceDef) {
 	for _, d := range defs {
 		fmt.Fprintf(&b, "[[instance]]\nname = %q\napp = %q\nurl = %q\napi_key = %q\n\n", d.name, d.app, d.url, d.key)
 	}
+	useConfigTOML(t, b.String())
+}
+
+// useConfigTOML makes arr read toml as its config until t ends.
+func useConfigTOML(t *testing.T, toml string) {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(toml), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(config.EnvVar, path)

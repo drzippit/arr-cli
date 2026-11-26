@@ -18,15 +18,20 @@ type terminal struct {
 // detectTerminal reports whether w is a terminal, and if so what kind. Tests
 // replace it.
 var detectTerminal = func(w io.Writer) (terminal, bool) {
-	f, ok := w.(*os.File)
-	if !ok || !term.IsTerminal(f.Fd()) {
+	if !isTerminal(w) {
 		return terminal{}, false
 	}
-	width, _, err := term.GetSize(f.Fd())
+	width, _, err := term.GetSize(w.(*os.File).Fd())
 	if err != nil {
 		return terminal{}, false
 	}
 	return terminal{width: width, profile: lipgloss.NewRenderer(w).ColorProfile()}, true
+}
+
+// isTerminal reports whether v is a file open on a terminal.
+func isTerminal(v any) bool {
+	f, ok := v.(*os.File)
+	return ok && term.IsTerminal(f.Fd())
 }
 
 // newRenderer returns a Lip Gloss renderer for w that styles output only when

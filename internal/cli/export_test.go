@@ -25,3 +25,11 @@ func SetTerminal(t testing.TB, width int) {
 	}
 	t.Cleanup(func() { detectTerminal = prev })
 }
+
+// SetChooser makes the CLI act as if it runs in a terminal, asking choose
+// whenever it would show a picker, until t ends.
+func SetChooser(t testing.TB, choose func(title string, options []string) (int, error)) {
+	prev := newChooser
+	newChooser = func(io.Reader, io.Writer) chooser { return choose }
+	t.Cleanup(func() { newChooser = prev })
+}
