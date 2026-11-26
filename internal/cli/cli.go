@@ -125,5 +125,6 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd.AddCommand(newQueueCmd(only, flags))
 	cmd.AddCommand(newCalendarCmd(only, flags))
 	cmd.AddCommand(newListCmd(only, flags))
+	cmd.AddCommand(newSearchCmd(inst, flags))
 	return cmd
 }
