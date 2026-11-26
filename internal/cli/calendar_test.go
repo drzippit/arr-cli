@@ -214,7 +214,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "title": "Avengers: Doomsday",
     "year": 2026,
     "release": "inCinemas",
-    "hasFile": false
+    "hasFile": false,
+    "monitored": true
   },
   {
     "instance": "sonarr",
@@ -225,7 +226,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "season": 2,
     "episode": 1,
     "episodeTitle": "The Return",
-    "hasFile": false
+    "hasFile": false,
+    "monitored": true
   },
   {
     "instance": "sonarr",
@@ -236,7 +238,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "season": 2,
     "episode": 2,
     "episodeTitle": "Ink and Steel",
-    "hasFile": true
+    "hasFile": true,
+    "monitored": true
   },
   {
     "instance": "radarr-4k",
@@ -245,7 +248,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "title": "Project Hail Mary",
     "year": 2026,
     "release": "digital",
-    "hasFile": false
+    "hasFile": false,
+    "monitored": true
   },
   {
     "instance": "radarr-4k",
@@ -254,7 +258,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "title": "Project Hail Mary",
     "year": 2026,
     "release": "physical",
-    "hasFile": false
+    "hasFile": false,
+    "monitored": true
   },
   {
     "instance": "sonarr",
@@ -265,7 +270,8 @@ func TestCalendarJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "season": 2,
     "episode": 8,
     "episodeTitle": "Sweet Vitriol",
-    "hasFile": false
+    "hasFile": false,
+    "monitored": true
   }
 ]
 `
@@ -308,4 +314,49 @@ func TestCalendarPrevInJanuaryIsDecemberOfTheYearBefore(t *testing.T) {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
 	assertInOrder(t, out, "December 2026", "Tue 1 Dec", "The Odyssey", "physical release")
+}
+
+func TestCalendarAsksForUnmonitoredOnlyWithFlag(t *testing.T) {
+	today(t)
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.URL.Query().Get("unmonitored"))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+	}))
+	t.Cleanup(srv.Close)
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	run(t, "sonarr", "calendar")
+	run(t, "sonarr", "calendar", "--unmonitored")
+
+	if len(got) != 2 || got[0] == "true" || got[1] != "true" {
+		t.Errorf("unmonitored params = %q, want only the second request to ask for them", got)
+	}
+}
+
+func TestCalendarMarksUnmonitoredEntries(t *testing.T) {
+	today(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[
+			{"title":"Heat 2","year":2026,"digitalRelease":"2026-11-03T00:00:00Z","monitored":false},
+			{"title":"Dune","year":2021,"digitalRelease":"2026-11-04T00:00:00Z","monitored":true}
+		]`))
+	}))
+	t.Cleanup(srv.Close)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "radarr", "calendar", "--unmonitored")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	assertInOrder(t, out, "Heat 2", "unmonitored", "Dune")
+	if strings.Count(out, "unmonitored") != 1 {
+		t.Errorf("only the unmonitored Movie should be marked:\n%s", out)
+	}
+
+	out, _, _ = run(t, "radarr", "calendar", "--unmonitored", "--json")
+	assertInOrder(t, out, `"title": "Heat 2"`, `"monitored": false`, `"title": "Dune"`, `"monitored": true`)
 }

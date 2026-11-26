@@ -35,6 +35,7 @@ type calendarRecord struct {
 	EpisodeTitle string     `json:"episodeTitle,omitempty"`
 	ReleaseKind  string     `json:"release,omitempty"`
 	HasFile      bool       `json:"hasFile"`
+	Monitored    bool       `json:"monitored"`
 
 	day time.Time // local midnight on Date
 }
@@ -55,7 +56,7 @@ var releaseKinds = []struct {
 // `arr calendar`.
 func newCalendarCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
 	var month string
-	var list bool
+	var list, unmonitored bool
 	cmd := &cobra.Command{
 		Use:   "calendar",
 		Short: "Show the episodes and Movie releases due in one calendar month",
@@ -70,7 +71,7 @@ func newCalendarCmd(instances func() ([]config.Instance, error), flags *globalFl
 				return err
 			}
 			fetch := func(ctx context.Context, inst config.Instance) instanceResult[calendarRecord] {
-				return fetchCalendar(ctx, inst, first)
+				return fetchCalendar(ctx, inst, first, unmonitored)
 			}
 			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetch))
 			sortCalendar(recs)
@@ -80,6 +81,7 @@ func newCalendarCmd(instances func() ([]config.Instance, error), flags *globalFl
 			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
+	cmd.Flags().BoolVar(&unmonitored, "unmonitored", false, "include unmonitored episodes and Movies")
 	cmd.Flags().StringVar(&month, "month", "", "month to show: YYYY-MM, next or prev (default: this month)")
 	// The list is the only view until the month grid lands; then the grid
 	// becomes the default and --list chooses this view.
@@ -111,7 +113,7 @@ type calendarMonth struct{ first, next time.Time }
 
 func (m calendarMonth) contains(t time.Time) bool { return !t.Before(m.first) && t.Before(m.next) }
 
-func fetchCalendar(ctx context.Context, inst config.Instance, first time.Time) instanceResult[calendarRecord] {
+func fetchCalendar(ctx context.Context, inst config.Instance, first time.Time, unmonitored bool) instanceResult[calendarRecord] {
 	key, err := inst.ResolveAPIKey()
 	if err != nil {
 		return instanceResult[calendarRecord]{err: err}
@@ -126,13 +128,13 @@ func fetchCalendar(ctx context.Context, inst config.Instance, first time.Time) i
 	var recs []calendarRecord
 	switch inst.App {
 	case config.Sonarr:
-		eps, err := client.EpisodeCalendar(ctx, start, end)
+		eps, err := client.EpisodeCalendar(ctx, start, end, unmonitored)
 		if err != nil {
 			return instanceResult[calendarRecord]{err: err}
 		}
 		recs = episodeRecords(inst, month, eps)
 	case config.Radarr:
-		movies, err := client.MovieCalendar(ctx, start, end)
+		movies, err := client.MovieCalendar(ctx, start, end, unmonitored)
 		if err != nil {
 			return instanceResult[calendarRecord]{err: err}
 		}
@@ -158,6 +160,7 @@ func episodeRecords(inst config.Instance, month calendarMonth, eps []arrapi.Cale
 			Episode:      &ep.EpisodeNumber,
 			EpisodeTitle: ep.Title,
 			HasFile:      ep.HasFile,
+			Monitored:    ep.Monitored,
 			day:          time.Date(airs.Year(), airs.Month(), airs.Day(), 0, 0, 0, 0, airs.Location()),
 		}
 		if ep.Series != nil {
@@ -192,6 +195,7 @@ func movieRecords(inst config.Instance, month calendarMonth, movies []arrapi.Cal
 				Year:        m.Year,
 				ReleaseKind: rk.kind,
 				HasFile:     m.HasFile,
+				Monitored:   m.Monitored,
 				day:         day,
 			})
 		}
@@ -273,12 +277,17 @@ func (r calendarRecord) displayTitle() string {
 	return fmt.Sprintf("%s S%02dE%02d", r.Title, *r.Season, *r.Episode)
 }
 
-// displayDetail is the episode's title, or the kind of Movie release.
+// displayDetail is the episode's title, or the kind of Movie release, marked
+// if the episode or Movie is unmonitored.
 func (r calendarRecord) displayDetail() string {
+	detail := r.EpisodeTitle
 	for _, rk := range releaseKinds {
 		if rk.kind == r.ReleaseKind {
-			return rk.label
+			detail = rk.label
 		}
 	}
-	return r.EpisodeTitle
+	if !r.Monitored {
+		detail += " (unmonitored)"
+	}
+	return detail
 }
