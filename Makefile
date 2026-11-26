@@ -1,5 +1,7 @@
-# Integration tests run arr against real Sonarr and Radarr in Docker; see
-# docs/integration-tests.md. A plain `go test ./...` never runs them.
+# `make dist` builds the release archives; .github/workflows/release.yml runs
+# it for each v* tag. `make integration` runs arr against real Sonarr and
+# Radarr in Docker; see docs/integration-tests.md. A plain `go test ./...`
+# never runs those.
 
 ARR_IT_SONARR_PORT ?= 18989
 ARR_IT_RADARR_PORT ?= 17878
@@ -24,3 +26,31 @@ integration:
 	trap 'exit 130' INT TERM; \
 	$(COMPOSE) up --detach --wait --wait-timeout 300 && \
 	go test -tags integration -count=1 -run '^TestIntegration' $(TESTFLAGS) ./...
+
+# The platforms a release is built for, as GOOS/GOARCH.
+PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
+# The release being built, as its tag; the workflow passes it.
+VERSION ?= dev
+
+.PHONY: dist
+# Build a static arr for each platform into dist/, each packed on its own as
+# arr_<version>_<os>_<arch>.tar.gz (.zip for Windows), plus SHA256SUMS over
+# the archives.
+dist:
+	@rm -rf dist && mkdir -p dist; \
+	set -e; \
+	for platform in $(PLATFORMS); do \
+		os=$${platform%/*}; arch=$${platform#*/}; \
+		name=arr_$(VERSION)_$${os}_$${arch}; \
+		bin=arr; [ "$$os" = windows ] && bin=arr.exe; \
+		mkdir -p dist/$$name; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags='-s -w' -o dist/$$name/$$bin ./cmd/arr; \
+		if [ "$$os" = windows ]; then \
+			(cd dist/$$name && python3 -m zipfile -c ../$$name.zip $$bin); \
+		else \
+			tar -C dist/$$name -czf dist/$$name.tar.gz $$bin; \
+		fi; \
+		rm -rf dist/$$name; \
+		echo "built dist/$$name"; \
+	done; \
+	cd dist && sha256sum arr_* > SHA256SUMS

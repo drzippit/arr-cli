@@ -1,0 +1,41 @@
+# Pushing a tag such as v0.1.0 tests arr, builds it for every platform in the
+# Makefile's PLATFORMS, and publishes a GitHub release of the tag with those
+# archives and their SHA256SUMS. A tag with a hyphen (v0.2.0-rc1) becomes a
+# pre-release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build
+        run: make dist VERSION="$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: Publish
+        run: |
+          prerelease=()
+          case "$TAG" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$TAG" dist/* --verify-tag --generate-notes --title "$TAG" "${prerelease[@]}"
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
