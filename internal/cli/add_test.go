@@ -17,13 +17,14 @@ import (
 
 // addedMovie is the part of a POST /api/v3/movie body the tests check.
 type addedMovie struct {
-	Title            string `json:"title"`
-	Year             int    `json:"year"`
-	TmdbID           int    `json:"tmdbId"`
-	QualityProfileID int    `json:"qualityProfileId"`
-	RootFolderPath   string `json:"rootFolderPath"`
-	Monitored        bool   `json:"monitored"`
-	AddOptions       struct {
+	Title               string `json:"title"`
+	Year                int    `json:"year"`
+	TmdbID              int    `json:"tmdbId"`
+	QualityProfileID    int    `json:"qualityProfileId"`
+	RootFolderPath      string `json:"rootFolderPath"`
+	Monitored           bool   `json:"monitored"`
+	MinimumAvailability string `json:"minimumAvailability"`
+	AddOptions          struct {
 		SearchForMovie bool `json:"searchForMovie"`
 	} `json:"addOptions"`
 }
@@ -54,8 +55,13 @@ func fakeRadarrForAdd(t *testing.T) (*httptest.Server, *[]addedMovie) {
 			t.Errorf("POST body is not a Movie: %v\n%s", err, body)
 		}
 		added = append(added, m)
+		// Radarr answers with the Movie as it is now in the Library.
+		var created map[string]any
+		json.Unmarshal(body, &created)
+		created["id"] = 42
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Write(body)
+		json.NewEncoder(w).Encode(created)
 	}))
 	t.Cleanup(srv.Close)
 	return srv, &added
@@ -349,6 +355,88 @@ func TestAddByUnknownTMDBIDFails(t *testing.T) {
 
 	if code == 0 || !strings.Contains(stderr, "no Movie with TMDB ID 999999") {
 		t.Errorf("want failure naming the unknown TMDB ID, got exit %d, stderr %q", code, stderr)
+	}
+	if len(*added) != 0 {
+		t.Errorf("added %d Movies, want none", len(*added))
+	}
+}
+
+func TestAddJSONPrintsTheAddedMovie(t *testing.T) {
+	srv, _ := fakeRadarrForAdd(t)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "radarr", "add", "--tmdb", "604", "--quality", "hd-1080p", "--root", "/movies/", "--json")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	want := `{
+  "instance": "radarr",
+  "app": "radarr",
+  "id": 42,
+  "title": "The Matrix Reloaded",
+  "year": 2003,
+  "tmdbId": 604,
+  "qualityProfile": "HD-1080p",
+  "rootFolder": "/movies",
+  "minimumAvailability": "released",
+  "monitored": true,
+  "searching": true
+}
+`
+	if out != want {
+		t.Errorf("JSON output:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+func TestAddMinimumAvailabilityDefaultsToReleased(t *testing.T) {
+	srv, added := fakeRadarrForAdd(t)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	_, stderr, code := run(t, "radarr", "add", "--tmdb", "604", "--quality", "Any", "--root", "/movies")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	if got := (*added)[0].MinimumAvailability; got != "released" {
+		t.Errorf("minimum availability %q, want released", got)
+	}
+}
+
+func TestAddMinimumAvailabilityComesFromFlagThenConfig(t *testing.T) {
+	srv, added := fakeRadarrForAdd(t)
+	useConfigTOML(t, fmt.Sprintf(`[[instance]]
+name = "radarr"
+app = "radarr"
+url = %q
+api_key = %q
+quality_profile = "Any"
+root_folder = "/movies"
+minimum_availability = "announced"
+`, srv.URL, testAPIKey))
+
+	_, stderr, code := run(t, "radarr", "add", "--tmdb", "604")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	_, stderr, code = run(t, "radarr", "add", "--tmdb", "624860", "--availability", "incinemas")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+
+	if len(*added) != 2 || (*added)[0].MinimumAvailability != "announced" || (*added)[1].MinimumAvailability != "inCinemas" {
+		t.Errorf("added %+v, want announced from the config, then inCinemas from the flag", *added)
+	}
+}
+
+func TestAddUnknownMinimumAvailabilityFails(t *testing.T) {
+	srv, added := fakeRadarrForAdd(t)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	_, stderr, code := run(t, "radarr", "add", "--tmdb", "604", "--quality", "Any", "--root", "/movies", "--availability", "soon")
+
+	if code == 0 || !strings.Contains(stderr, `"soon"`) || !strings.Contains(stderr, "announced, inCinemas, released") {
+		t.Errorf("want failure naming the value and the valid ones, got exit %d, stderr %q", code, stderr)
 	}
 	if len(*added) != 0 {
 		t.Errorf("added %d Movies, want none", len(*added))
