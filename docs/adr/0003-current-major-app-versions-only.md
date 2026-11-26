@@ -1,0 +1,5 @@
+# Only the current major version of each App
+
+arr-cli supports Sonarr 4 and later and Radarr 5 and later, and is tested only against those. Sonarr 3 no longer gets updates, and supporting it would mean a second path for adding a Series, because Sonarr 3 requires a language profile and Sonarr 4 dropped them, plus a second set of recorded responses to test against.
+
+Commands that change an Instance, such as `add`, check its version first and refuse an older one with an error that names the version, because an older App would otherwise fail with its own validation messages that do not explain the cause. There is no flag to skip the check, since it would amount to a promise of support. Read commands do not check, to stay at one request each, and work as far as they can. `arr status` marks an older version as unsupported but does not count it as a Warning or change the exit code: a Warning is a Health Check the Instance reports about itself, and a working setup should not start failing scripts.

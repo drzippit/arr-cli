@@ -49,6 +49,9 @@ func newAddMovieCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := requireSupportedVersion(ctx, inst, a.client); err != nil {
+				return err
+			}
 			movie, err := a.pickMovie(ctx, query, tmdbID)
 			if err != nil {
 				return err

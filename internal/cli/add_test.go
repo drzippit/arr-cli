@@ -33,9 +33,17 @@ type addedMovie struct {
 // Movie added with POST /api/v3/movie.
 func fakeRadarrForAdd(t *testing.T) (*httptest.Server, *[]addedMovie) {
 	t.Helper()
+	h, added := radarrForAddHandler(t)
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv, added
+}
+
+func radarrForAddHandler(t *testing.T) (http.Handler, *[]addedMovie) {
+	t.Helper()
 	var added []addedMovie
 	recorded := recordedHandler(t, "radarr")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/api/v3/movie/lookup/tmdb" {
 			lookupByTMDB(t, w, r)
 			return
@@ -62,9 +70,7 @@ func fakeRadarrForAdd(t *testing.T) (*httptest.Server, *[]addedMovie) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(created)
-	}))
-	t.Cleanup(srv.Close)
-	return srv, &added
+	}), &added
 }
 
 // lookupByTMDB answers GET /api/v3/movie/lookup/tmdb as Radarr does: with the
@@ -437,6 +443,22 @@ func TestAddUnknownMinimumAvailabilityFails(t *testing.T) {
 
 	if code == 0 || !strings.Contains(stderr, `"soon"`) || !strings.Contains(stderr, "announced, inCinemas, released") {
 		t.Errorf("want failure naming the value and the valid ones, got exit %d, stderr %q", code, stderr)
+	}
+	if len(*added) != 0 {
+		t.Errorf("added %d Movies, want none", len(*added))
+	}
+}
+
+func TestAddRefusesRadarrOlderThanSupported(t *testing.T) {
+	h, added := radarrForAddHandler(t)
+	srv := httptest.NewServer(runningVersion("Radarr", "4.7.5.7809", h))
+	t.Cleanup(srv.Close)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	_, stderr, code := run(t, "radarr", "add", "--tmdb", "604", "--quality", "Any", "--root", "/movies")
+
+	if code == 0 || !strings.Contains(stderr, "radarr runs Radarr 4.7.5.7809; arr-cli supports Radarr 5 and later") {
+		t.Errorf("want failure naming the unsupported version, got exit %d, stderr %q", code, stderr)
 	}
 	if len(*added) != 0 {
 		t.Errorf("added %d Movies, want none", len(*added))

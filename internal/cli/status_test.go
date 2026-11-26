@@ -62,6 +62,19 @@ func recordedHandler(t *testing.T, app string) http.Handler {
 	})
 }
 
+// runningVersion answers /api/v3/system/status as appName at version, and
+// passes every other request to next.
+func runningVersion(appName, version string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v3/system/status" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"appName": %q, "version": %q}`, appName, version)
+	})
+}
+
 // instanceDef is one [[instance]] entry for a test config.
 type instanceDef struct {
 	name, app, url, key string
@@ -146,6 +159,7 @@ func TestStatusJSONIsFlatUnstyledArray(t *testing.T) {
     "app": "radarr",
     "reachable": true,
     "version": "5.14.0.9383",
+    "supported": true,
     "warnings": 0
   }
 ]
@@ -284,5 +298,32 @@ func TestInvalidConfigFailsBeforeRunning(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "clashes with the top-level command") {
 		t.Errorf("stderr should explain the config error, got %q", stderr)
+	}
+}
+
+func TestStatusMarksVersionOlderThanSupported(t *testing.T) {
+	srv := httptest.NewServer(runningVersion("Sonarr", "3.0.10.1567", recordedHandler(t, "sonarr")))
+	t.Cleanup(srv.Close)
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sonarr", "status")
+
+	if code != 0 {
+		t.Fatalf("an unsupported version should not fail status, got exit %d, stderr: %s", code, stderr)
+	}
+	if !strings.Contains(out, "3.0.10.1567 (unsupported)") {
+		t.Errorf("output should mark the version unsupported:\n%s", out)
+	}
+	if !strings.Contains(out, "│ 2 ") {
+		t.Errorf("an unsupported version should not change the Warning count:\n%s", out)
+	}
+
+	out, _, _ = run(t, "sonarr", "status", "--json")
+	var got []map[string]any
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output is not JSON: %v\n%s", err, out)
+	}
+	if got[0]["supported"] != false || got[0]["version"] != "3.0.10.1567" {
+		t.Errorf("JSON should give the plain version and supported false, got %v", got[0])
 	}
 }
