@@ -20,11 +20,19 @@ const testAPIKey = "test-key"
 // fakeInstance serves the recorded /api/v3 responses in testdata/<app>.
 func fakeInstance(t *testing.T, app string) *httptest.Server {
 	t.Helper()
+	srv := httptest.NewServer(recordedHandler(t, app))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// recordedHandler replays the recorded /api/v3 responses in testdata/<app>.
+func recordedHandler(t *testing.T, app string) http.Handler {
+	t.Helper()
 	routes := map[string]string{
 		"/api/v3/system/status": "system_status.json",
 		"/api/v3/health":        "health.json",
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Api-Key") != testAPIKey {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -37,13 +45,13 @@ func fakeInstance(t *testing.T, app string) *httptest.Server {
 		}
 		body, err := os.ReadFile(filepath.Join("testdata", app, file))
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(body)
-	}))
-	t.Cleanup(srv.Close)
-	return srv
+	})
 }
 
 // instanceDef is one [[instance]] entry for a test config.
@@ -260,7 +268,7 @@ func TestInvalidConfigFailsBeforeRunning(t *testing.T) {
 	if code == 0 {
 		t.Error("exit code 0 with an invalid config")
 	}
-	if !strings.Contains(stderr, "reserved") {
+	if !strings.Contains(stderr, "clashes with the top-level command") {
 		t.Errorf("stderr should explain the config error, got %q", stderr)
 	}
 }

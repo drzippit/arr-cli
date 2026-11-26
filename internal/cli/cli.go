@@ -60,6 +60,7 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 		return nil, err
 	}
 
+	root.AddCommand(newStatusCmd(cfg.Instances, flags))
 	for _, inst := range cfg.Instances {
 		root.AddCommand(newInstanceCmd(inst, flags))
 	}
@@ -75,6 +76,6 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 			return cmd.Help()
 		},
 	}
-	cmd.AddCommand(newStatusCmd(inst, flags))
+	cmd.AddCommand(newStatusCmd([]config.Instance{inst}, flags))
 	return cmd
 }
