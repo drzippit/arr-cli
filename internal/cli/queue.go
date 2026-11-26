@@ -129,11 +129,15 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 	return renderTable(w, []string{"INSTANCE", "TITLE", "EPISODE", "PROGRESS", "ETA", "STATUS", "CLIENT"}, rows)
 }
 
-func (r queueRecord) displayTitle() string {
-	if r.Year > 0 {
-		return fmt.Sprintf("%s (%d)", r.Title, r.Year)
+func (r queueRecord) displayTitle() string { return titleWithYear(r.Title, r.Year) }
+
+// titleWithYear writes a Title as "Good Will Hunting (1997)", or just its name
+// when the year is unknown.
+func titleWithYear(title string, year int) string {
+	if year > 0 {
+		return fmt.Sprintf("%s (%d)", title, year)
 	}
-	return r.Title
+	return title
 }
 
 func (r queueRecord) displayEpisode() string {

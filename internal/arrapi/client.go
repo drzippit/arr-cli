@@ -225,3 +225,49 @@ func calendarQuery(start, end time.Time, unmonitored bool) url.Values {
 		"unmonitored": {strconv.FormatBool(unmonitored)},
 	}
 }
+
+// Movie is one Movie from Radarr's /api/v3/movie.
+type Movie struct {
+	Title      string `json:"title"`
+	SortTitle  string `json:"sortTitle"`
+	Year       int    `json:"year"`
+	Status     string `json:"status"`
+	Monitored  bool   `json:"monitored"`
+	HasFile    bool   `json:"hasFile"`
+	SizeOnDisk int64  `json:"sizeOnDisk"`
+	TmdbID     int    `json:"tmdbId"`
+}
+
+// Movies fetches every Movie in a Radarr Instance's Library.
+func (c *Client) Movies(ctx context.Context) ([]Movie, error) {
+	var movies []Movie
+	err := c.get(ctx, "movie", nil, &movies)
+	return movies, err
+}
+
+// Series is one Series from Sonarr's /api/v3/series.
+type Series struct {
+	Title      string           `json:"title"`
+	SortTitle  string           `json:"sortTitle"`
+	Year       int              `json:"year"`
+	Status     string           `json:"status"`
+	Monitored  bool             `json:"monitored"`
+	TvdbID     int              `json:"tvdbId"`
+	Statistics SeriesStatistics `json:"statistics"`
+}
+
+// SeriesStatistics counts a Series' seasons and the episodes on disk.
+// EpisodeCount counts only the monitored or downloaded episodes.
+type SeriesStatistics struct {
+	SeasonCount      int   `json:"seasonCount"`
+	EpisodeFileCount int   `json:"episodeFileCount"`
+	EpisodeCount     int   `json:"episodeCount"`
+	SizeOnDisk       int64 `json:"sizeOnDisk"`
+}
+
+// AllSeries fetches every Series in a Sonarr Instance's Library.
+func (c *Client) AllSeries(ctx context.Context) ([]Series, error) {
+	var series []Series
+	err := c.get(ctx, "series", nil, &series)
+	return series, err
+}
