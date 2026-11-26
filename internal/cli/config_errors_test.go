@@ -87,3 +87,13 @@ func TestStatusWithNoInstancesConfiguredSaysSo(t *testing.T) {
 		t.Errorf("stderr should say no Instances are configured, got %q", stderr)
 	}
 }
+
+func TestSearchIsReservedAsInstanceName(t *testing.T) {
+	useConfig(t, instanceDef{"search", "sonarr", "http://127.0.0.1:1", testAPIKey})
+
+	_, stderr, code := run(t, "status")
+
+	if code == 0 || !strings.Contains(stderr, "clashes with the top-level command") {
+		t.Errorf("an Instance named search should be rejected, got exit %d, stderr %q", code, stderr)
+	}
+}

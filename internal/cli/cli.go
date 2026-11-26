@@ -39,9 +39,11 @@ type globalFlags struct {
 	json bool
 }
 
-// plannedCommands are top-level commands that do not exist yet. Their names
-// are reserved now so a config that loads today keeps loading when they land.
-var plannedCommands = []string{"config"}
+// reservedWithoutCommand are names no Instance may take although there is no
+// top-level command by that name: config is planned, and search runs only
+// against one Instance (ADR 0002) but is kept free in case that changes. A
+// config that loads today keeps loading if either becomes a top-level command.
+var reservedWithoutCommand = []string{"config", "search"}
 
 func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	flags := &globalFlags{}
@@ -82,10 +84,10 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	return root, nil
 }
 
-// reservedNames returns every top-level command name, including planned ones
-// and aliases.
+// reservedNames returns every top-level command name and alias, and the names
+// in reservedWithoutCommand.
 func reservedNames(root *cobra.Command) []string {
-	names := slices.Clone(plannedCommands)
+	names := slices.Clone(reservedWithoutCommand)
 	for _, cmd := range root.Commands() {
 		names = append(names, cmd.Name())
 		names = append(names, cmd.Aliases...)
