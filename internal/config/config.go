@@ -18,8 +18,20 @@ import (
 // EnvVar names the environment variable that overrides the config path.
 const EnvVar = "ARR_CLI_CONFIG"
 
-// Apps lists the Apps arr-cli can talk to.
-var Apps = []string{"sonarr", "radarr"}
+// App is one of the *arr applications arr-cli talks to.
+type App string
+
+// The Apps arr-cli can talk to.
+const (
+	Sonarr App = "sonarr"
+	Radarr App = "radarr"
+)
+
+// Apps lists every App arr-cli can talk to.
+var Apps = []App{Sonarr, Radarr}
+
+// Valid reports whether a is an App arr-cli can talk to.
+func (a App) Valid() bool { return slices.Contains(Apps, a) }
 
 // ReservedNames are top-level command names. An Instance may not use one,
 // because Instance names share the command namespace (ADR 0002).
@@ -33,7 +45,7 @@ type Config struct {
 // Instance is one running deployment of an App.
 type Instance struct {
 	Name      string `toml:"name"`
-	App       string `toml:"app"`
+	App       App    `toml:"app"`
 	URL       string `toml:"url"`
 	APIKey    string `toml:"api_key"`
 	APIKeyCmd string `toml:"api_key_cmd"`
@@ -85,8 +97,8 @@ func (c *Config) validate() error {
 		if slices.Contains(ReservedNames, inst.Name) {
 			return fmt.Errorf("instance %q: name is reserved for a top-level command", inst.Name)
 		}
-		if !slices.Contains(Apps, inst.App) {
-			return fmt.Errorf("instance %q: app %q is not one of %s", inst.Name, inst.App, strings.Join(Apps, ", "))
+		if !inst.App.Valid() {
+			return fmt.Errorf("instance %q: app %q is not one of %v", inst.Name, inst.App, Apps)
 		}
 		if inst.URL == "" {
 			return fmt.Errorf("instance %q: missing url", inst.Name)
