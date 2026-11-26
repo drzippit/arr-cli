@@ -25,15 +25,19 @@ type statusRecord struct {
 	Health    []arrapi.HealthCheck `json:"health,omitempty"`
 }
 
-// newStatusCmd builds a status command for the given Instances: one for
-// `arr <instance> status`, or all of them for `arr status`.
-func newStatusCmd(insts []config.Instance, flags *globalFlags) *cobra.Command {
+// newStatusCmd builds a status command for the Instances that instances
+// returns: one for `arr <instance> status`, or all of them for `arr status`.
+func newStatusCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
 	var verbose bool
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show whether each Instance is reachable, its version and its Warnings",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			insts, err := instances()
+			if err != nil {
+				return err
+			}
 			recs := fetchStatusAll(cmd.Context(), insts)
 			if err := renderStatus(cmd.OutOrStdout(), recs, verbose, flags.json); err != nil {
 				return err

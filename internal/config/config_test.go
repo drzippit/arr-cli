@@ -164,10 +164,11 @@ func TestPathDefaultsToUserConfigDir(t *testing.T) {
 }
 
 func TestLoadRejectsInstanceNamedAfterTopLevelCommand(t *testing.T) {
-	for _, name := range []string{"status", "queue", "calendar", "config", "help", "completion"} {
+	reserved := []string{"status", "queue", "calendar", "config"}
+	for _, name := range reserved {
 		t.Run(name, func(t *testing.T) {
 			body := "[[instance]]\nname = \"" + name + "\"\napp = \"sonarr\"\nurl = \"http://x\"\napi_key = \"k\"\n"
-			_, err := config.Load(writeConfig(t, body))
+			_, err := config.Load(writeConfig(t, body), reserved...)
 			if err == nil {
 				t.Fatalf("Load accepted an Instance named %q", name)
 			}

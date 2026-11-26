@@ -33,12 +33,6 @@ var Apps = []App{Sonarr, Radarr}
 // Valid reports whether a is an App arr-cli can talk to.
 func (a App) Valid() bool { return slices.Contains(Apps, a) }
 
-// ReservedNames are top-level command names. An Instance may not use one,
-// because Instance names share the command namespace (ADR 0002). The list
-// includes planned commands (queue, calendar, config) so a config that works
-// today keeps working when they land.
-var ReservedNames = []string{"status", "queue", "calendar", "config", "help", "completion"}
-
 // Config is the parsed config file.
 type Config struct {
 	Instances []Instance `toml:"instance"`
@@ -66,8 +60,10 @@ func Path() string {
 	return filepath.Join(home, ".config", "arr-cli", "config.toml")
 }
 
-// Load reads and validates the config file at path.
-func Load(path string) (*Config, error) {
+// Load reads and validates the config file at path. An Instance named after
+// one of reservedNames (the top-level commands) is rejected, because Instance
+// names share the command namespace (ADR 0002).
+func Load(path string, reservedNames ...string) (*Config, error) {
 	var cfg Config
 	md, err := toml.DecodeFile(path, &cfg)
 	if err != nil {
@@ -80,13 +76,13 @@ func Load(path string) (*Config, error) {
 	if undecoded := md.Undecoded(); len(undecoded) > 0 {
 		return nil, fmt.Errorf("%s: unknown key %q", path, undecoded[0].String())
 	}
-	if err := cfg.validate(); err != nil {
+	if err := cfg.validate(reservedNames); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return &cfg, nil
 }
 
-func (c *Config) validate() error {
+func (c *Config) validate(reservedNames []string) error {
 	seen := map[string]bool{}
 	for i, inst := range c.Instances {
 		if inst.Name == "" {
@@ -96,7 +92,7 @@ func (c *Config) validate() error {
 			return fmt.Errorf("duplicate instance name %q", inst.Name)
 		}
 		seen[inst.Name] = true
-		if slices.Contains(ReservedNames, inst.Name) {
+		if slices.Contains(reservedNames, inst.Name) {
 			return fmt.Errorf("instance %q clashes with the top-level command \"arr %s\"; choose another name", inst.Name, inst.Name)
 		}
 		if !inst.App.Valid() {
