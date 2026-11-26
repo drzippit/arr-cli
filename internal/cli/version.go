@@ -34,6 +34,12 @@ func requireSupportedVersion(ctx context.Context, inst config.Instance, client *
 	if err != nil {
 		return err
 	}
+	return checkVersion(inst, sys)
+}
+
+// checkVersion fails when sys, the Instance's status, gives a version of its
+// App that arr-cli does not support.
+func checkVersion(inst config.Instance, sys arrapi.SystemStatus) error {
 	if supportedVersion(inst.App, sys.Version) {
 		return nil
 	}

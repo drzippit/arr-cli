@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 )
@@ -30,6 +31,14 @@ const (
 // Apps lists every App arr-cli can talk to.
 var Apps = []App{Sonarr, Radarr}
 
+// DisplayName is how the App spells its own name, as in "Sonarr".
+func (a App) DisplayName() string {
+	if a == "" {
+		return ""
+	}
+	return strings.ToUpper(string(a[:1])) + string(a[1:])
+}
+
 // Valid reports whether a is an App arr-cli can talk to.
 func (a App) Valid() bool { return slices.Contains(Apps, a) }
 
@@ -46,13 +55,13 @@ type Instance struct {
 	Name           string `toml:"name"`
 	App            App    `toml:"app"`
 	URL            string `toml:"url"`
-	APIKey         string `toml:"api_key"`
-	APIKeyCmd      string `toml:"api_key_cmd"`
-	QualityProfile string `toml:"quality_profile"`
-	RootFolder     string `toml:"root_folder"`
+	APIKey         string `toml:"api_key,omitempty"`
+	APIKeyCmd      string `toml:"api_key_cmd,omitempty"`
+	QualityProfile string `toml:"quality_profile,omitempty"`
+	RootFolder     string `toml:"root_folder,omitempty"`
 
-	MinimumAvailability string `toml:"minimum_availability"`
-	Monitor             string `toml:"monitor"`
+	MinimumAvailability string `toml:"minimum_availability,omitempty"`
+	Monitor             string `toml:"monitor,omitempty"`
 }
 
 // Path returns the config file path: $ARR_CLI_CONFIG if set, otherwise
@@ -90,6 +99,36 @@ func Load(path string, reservedNames ...string) (*Config, error) {
 	return &cfg, nil
 }
 
+// CheckName says why name cannot be given to a new Instance: it is blank,
+// has spaces, or an Instance or a top-level command (one of reservedNames)
+// already has it.
+func (c *Config) CheckName(name string, reservedNames ...string) error {
+	switch {
+	case strings.TrimSpace(name) == "":
+		return errors.New("missing name")
+	case strings.ContainsFunc(name, unicode.IsSpace):
+		return fmt.Errorf("instance name %q has spaces; it is typed as a command, as in arr <name> status", name)
+	case slices.ContainsFunc(c.Instances, func(i Instance) bool { return i.Name == name }):
+		return fmt.Errorf("duplicate instance name %q", name)
+	case slices.Contains(reservedNames, name):
+		return clashError(name)
+	}
+	return nil
+}
+
+// CanAdd says why inst cannot be added to the config, if it cannot.
+func (c *Config) CanAdd(inst Instance, reservedNames ...string) error {
+	if err := c.CheckName(inst.Name, reservedNames...); err != nil {
+		return err
+	}
+	next := Config{Instances: append(slices.Clone(c.Instances), inst)}
+	return next.validate(reservedNames)
+}
+
+func clashError(name string) error {
+	return fmt.Errorf("instance %q clashes with the top-level command \"arr %s\"; choose another name", name, name)
+}
+
 func (c *Config) validate(reservedNames []string) error {
 	seen := map[string]bool{}
 	for i, inst := range c.Instances {
@@ -101,7 +140,7 @@ func (c *Config) validate(reservedNames []string) error {
 		}
 		seen[inst.Name] = true
 		if slices.Contains(reservedNames, inst.Name) {
-			return fmt.Errorf("instance %q clashes with the top-level command \"arr %s\"; choose another name", inst.Name, inst.Name)
+			return clashError(inst.Name)
 		}
 		if !inst.App.Valid() {
 			return fmt.Errorf("instance %q: app %q is not one of %v", inst.Name, inst.App, Apps)
@@ -117,6 +156,15 @@ func (c *Config) validate(reservedNames []string) error {
 		}
 	}
 	return nil
+}
+
+// APIKeySource names the config key that gives the Instance's API key:
+// api_key or api_key_cmd.
+func (i Instance) APIKeySource() string {
+	if i.APIKeyCmd != "" {
+		return "api_key_cmd"
+	}
+	return "api_key"
 }
 
 // ResolveAPIKey returns the Instance's API key, running api_key_cmd through

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/muesli/termenv"
+
+	"github.com/drzippit/arr-cli/internal/config"
 )
 
 // SetNow makes the CLI see fn as the current time, and fn's location as the
@@ -33,4 +35,12 @@ func SetChooser(t testing.TB, choose func(title string, options []string, select
 	prev := newChooser
 	newChooser = func(io.Reader, io.Writer) chooser { return choose }
 	t.Cleanup(func() { newChooser = prev })
+}
+
+// SetInstanceForm makes the CLI act as if it runs in a terminal, calling
+// form whenever it would ask for a new Instance, until t ends.
+func SetInstanceForm(t testing.TB, form func(checkName func(string) error) (config.Instance, error)) {
+	prev := newInstanceForm
+	newInstanceForm = func(io.Reader, io.Writer) instanceForm { return form }
+	t.Cleanup(func() { newInstanceForm = prev })
 }

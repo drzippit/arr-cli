@@ -40,10 +40,10 @@ type globalFlags struct {
 }
 
 // reservedWithoutCommand are names no Instance may take although there is no
-// top-level command by that name: config is planned, and search runs only
-// against one Instance (ADR 0002) but is kept free in case that changes. A
-// config that loads today keeps loading if either becomes a top-level command.
-var reservedWithoutCommand = []string{"config", "search"}
+// top-level command by that name: search runs only against one Instance (ADR
+// 0002) but is kept free in case that changes, so a config that loads today
+// keeps loading if it becomes a top-level command.
+var reservedWithoutCommand = []string{"search"}
 
 func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	flags := &globalFlags{}
@@ -64,13 +64,15 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	root.AddCommand(newQueueCmd(src.all, flags))
 	root.AddCommand(newCalendarCmd(src.all, flags))
 	root.AddCommand(newListCmd(src.all, flags))
+	root.AddCommand(newConfigCmd(src, flags))
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 
-	cfg, err := config.Load(src.path, reservedNames(root)...)
+	src.reserved = reservedNames(root)
+	cfg, err := config.Load(src.path, src.reserved...)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
-		root.Long = fmt.Sprintf("No config found at %s; add Instances there or set %s.", src.path, config.EnvVar)
+		root.Long = fmt.Sprintf("No config found at %s; add an Instance with arr config add, or set %s.", src.path, config.EnvVar)
 		src.missing = true
 		return root, nil
 	case err != nil:
@@ -95,10 +97,13 @@ func reservedNames(root *cobra.Command) []string {
 	return names
 }
 
-// instanceSource gives commands that run across every Instance the Instances
-// from the config, which loads after those commands are registered.
+// instanceSource gives top-level commands, which are registered before the
+// config loads, what loading it found: the Instances, for commands that run
+// across every Instance and for arr config, and reserved, the names no
+// Instance may take.
 type instanceSource struct {
 	path      string
+	reserved  []string
 	missing   bool
 	instances []config.Instance
 }
@@ -106,9 +111,9 @@ type instanceSource struct {
 func (s *instanceSource) all() ([]config.Instance, error) {
 	switch {
 	case s.missing:
-		return nil, fmt.Errorf("no config found at %s; create it or set %s", s.path, config.EnvVar)
+		return nil, fmt.Errorf("no config found at %s; add an Instance with arr config add, or set %s", s.path, config.EnvVar)
 	case len(s.instances) == 0:
-		return nil, fmt.Errorf("no Instances configured in %s", s.path)
+		return nil, fmt.Errorf("no Instances configured in %s; add one with arr config add", s.path)
 	}
 	return s.instances, nil
 }
