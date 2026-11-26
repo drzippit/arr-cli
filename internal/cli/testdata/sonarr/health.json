@@ -1,0 +1,20 @@
+[
+  {
+    "source": "IndexerStatusCheck",
+    "type": "warning",
+    "message": "Indexers unavailable due to failures: Example Indexer",
+    "wikiUrl": "https://wiki.servarr.com/sonarr/system#indexers-are-unavailable-due-to-failures"
+  },
+  {
+    "source": "UpdateCheck",
+    "type": "notice",
+    "message": "New update is available: 4.0.12.2823",
+    "wikiUrl": "https://wiki.servarr.com/sonarr/system#new-update-is-available"
+  },
+  {
+    "source": "RootFolderCheck",
+    "type": "error",
+    "message": "Missing root folder: /tv/anime",
+    "wikiUrl": "https://wiki.servarr.com/sonarr/system#missing-root-folder"
+  }
+]
