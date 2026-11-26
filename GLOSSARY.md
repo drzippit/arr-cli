@@ -29,3 +29,11 @@ _Avoid_: collection, catalogue
 **Candidate**:
 A Series or Movie that an App's lookup returns as something that could be added to an Instance. A Candidate may match a Title already in that Instance's Library, and adding a Candidate makes it a Title.
 _Avoid_: result, match, lookup item
+
+**Health Check**:
+A problem an Instance reports about itself, such as an unreachable indexer or a missing root folder. Each has a severity of notice, warning or error.
+_Avoid_: health item, alert, issue
+
+**Warning**:
+A Health Check that needs attention, meaning one whose severity is warning or error. Notices are not Warnings.
+_Avoid_: health issue, problem
