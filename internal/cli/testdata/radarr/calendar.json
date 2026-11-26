@@ -1,0 +1,42 @@
+[
+  {
+    "title": "Project Hail Mary",
+    "originalTitle": "Project Hail Mary",
+    "sortTitle": "project hail mary",
+    "status": "released",
+    "inCinemas": "2026-03-20T00:00:00Z",
+    "digitalRelease": "2026-11-17T00:00:00Z",
+    "physicalRelease": "2026-11-24T00:00:00Z",
+    "year": 2026,
+    "hasFile": false,
+    "monitored": true,
+    "tmdbId": 687163,
+    "id": 81
+  },
+  {
+    "title": "The Odyssey",
+    "originalTitle": "The Odyssey",
+    "sortTitle": "odyssey",
+    "status": "released",
+    "inCinemas": "2026-07-17T00:00:00Z",
+    "digitalRelease": "2026-10-20T00:00:00Z",
+    "physicalRelease": "2026-12-01T00:00:00Z",
+    "year": 2026,
+    "hasFile": false,
+    "monitored": true,
+    "tmdbId": 1180906,
+    "id": 82
+  },
+  {
+    "title": "Avengers: Doomsday",
+    "originalTitle": "Avengers: Doomsday",
+    "sortTitle": "avengers doomsday",
+    "status": "announced",
+    "inCinemas": "2026-11-01T00:00:00Z",
+    "year": 2026,
+    "hasFile": false,
+    "monitored": true,
+    "tmdbId": 1003596,
+    "id": 83
+  }
+]
