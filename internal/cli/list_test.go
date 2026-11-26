@@ -305,3 +305,50 @@ func TestListWithoutInstanceFiltersAndPrintsJSON(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestListPlainPrintsOneTitlePerLine(t *testing.T) {
+	srv := fakeInstance(t, "radarr")
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "radarr", "list", "--plain")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	want := "Good Will Hunting (1997)\nThe Matrix (1999)\nProject Hail Mary (2026)\n"
+	if out != want {
+		t.Errorf("output:\n%q\nwant:\n%q", out, want)
+	}
+}
+
+func TestListPlainHeadsEachInstanceWhenThereAreSeveral(t *testing.T) {
+	sonarr := fakeInstance(t, "sonarr")
+	radarr := fakeInstance(t, "radarr")
+	useConfig(t,
+		instanceDef{"sonarr", "sonarr", sonarr.URL, testAPIKey},
+		instanceDef{"radarr", "radarr", radarr.URL, testAPIKey},
+	)
+
+	out, stderr, code := run(t, "list", "--plain")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	want := "sonarr\n" +
+		"Severance (2022)\nShōgun (2024)\nTwin Peaks (1990)\n" +
+		"\nradarr\n" +
+		"Good Will Hunting (1997)\nThe Matrix (1999)\nProject Hail Mary (2026)\n"
+	if out != want {
+		t.Errorf("output:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+func TestListPlainAndJSONCannotBeCombined(t *testing.T) {
+	useConfig(t, instanceDef{"radarr", "radarr", "http://127.0.0.1:1", testAPIKey})
+
+	_, stderr, code := run(t, "radarr", "list", "--plain", "--json")
+
+	if code == 0 || !strings.Contains(stderr, "--plain") {
+		t.Errorf("want an error naming --plain, got code %d, stderr %q", code, stderr)
+	}
+}

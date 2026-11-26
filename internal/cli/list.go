@@ -37,24 +37,40 @@ type libraryRecord struct {
 
 // newListCmd builds a list command for the Instances that instances returns:
 // one for `arr <instance> list`, or all of them for `arr list`. A query of
-// several words may be quoted or not.
+// several words may be quoted or not. --plain prints just the Titles, for
+// sharing a Library as text.
 func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
-	return &cobra.Command{
+	var plain bool
+	cmd := &cobra.Command{
 		Use:   "list [query]",
 		Short: "Show the Titles in each Instance's Library, optionally only those matching query",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if plain && flags.json {
+				return fmt.Errorf("--plain and --json cannot be used together")
+			}
 			insts, err := instances()
 			if err != nil {
 				return err
 			}
 			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchLibrary))
 			recs = titlesMatching(recs, strings.Join(args, " "))
-			if err := renderLibrary(cmd.OutOrStdout(), recs, flags.json); err != nil {
+			w := cmd.OutOrStdout()
+			switch {
+			case flags.json:
+				err = renderJSON(w, recs)
+			case plain:
+				err = renderPlainLibrary(w, recs, len(insts) > 1)
+			default:
+				err = renderLibrary(w, recs)
+			}
+			if err != nil {
 				return err
 			}
 			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
+	cmd.Flags().BoolVar(&plain, "plain", false, "print one Title per line, without a table")
+	return cmd
 }
 
 func fetchLibrary(ctx context.Context, inst config.Instance) instanceResult[libraryRecord] {
@@ -135,10 +151,7 @@ func titlesMatching(recs []libraryRecord, query string) []libraryRecord {
 	return out
 }
 
-func renderLibrary(w io.Writer, recs []libraryRecord, asJSON bool) error {
-	if asJSON {
-		return renderJSON(w, recs)
-	}
+func renderLibrary(w io.Writer, recs []libraryRecord) error {
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
 		rows = append(rows, []string{
@@ -146,6 +159,24 @@ func renderLibrary(w io.Writer, recs []libraryRecord, asJSON bool) error {
 		})
 	}
 	return renderTable(w, []string{"INSTANCE", "TITLE", "STATUS", "MONITORED", "FILES", "SIZE"}, rows)
+}
+
+// renderPlainLibrary writes one Title per line. With headed set, each
+// Instance's Titles follow a line with its name, and a blank line separates
+// the Instances.
+func renderPlainLibrary(w io.Writer, recs []libraryRecord, headed bool) error {
+	var b strings.Builder
+	for i, r := range recs {
+		if headed && (i == 0 || recs[i-1].Instance != r.Instance) {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(r.Instance + "\n")
+		}
+		b.WriteString(r.displayTitle() + "\n")
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
 }
 
 // displayFiles says how many of a Series' episodes are on disk, or whether a
