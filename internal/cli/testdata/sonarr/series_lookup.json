@@ -2,18 +2,29 @@
   {
     "title": "Twin Peaks",
     "sortTitle": "twin peaks",
+    "titleSlug": "twin-peaks",
     "status": "ended",
     "year": 1990,
     "tvdbId": 70533,
     "id": 3,
-    "path": "/tv/Twin Peaks"
+    "path": "/tv/Twin Peaks",
+    "seasons": [
+      { "seasonNumber": 0, "monitored": false },
+      { "seasonNumber": 1, "monitored": true },
+      { "seasonNumber": 2, "monitored": true }
+    ]
   },
   {
     "title": "Twin Peaks (2017)",
     "sortTitle": "twin peaks 2017",
+    "titleSlug": "twin-peaks-2017",
     "status": "ended",
     "year": 2017,
     "tvdbId": 301474,
-    "folder": "Twin Peaks (2017)"
+    "folder": "Twin Peaks (2017)",
+    "seasons": [
+      { "seasonNumber": 0, "monitored": false },
+      { "seasonNumber": 1, "monitored": true }
+    ]
   }
 ]

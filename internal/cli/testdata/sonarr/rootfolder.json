@@ -1,0 +1,4 @@
+[
+  { "id": 1, "path": "/tv", "accessible": true, "freeSpace": 500000000000 },
+  { "id": 2, "path": "/anime", "accessible": true, "freeSpace": 900000000000 }
+]

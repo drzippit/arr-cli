@@ -39,8 +39,9 @@ type Config struct {
 }
 
 // Instance is one running deployment of an App. QualityProfile (a profile
-// name), RootFolder (a path) and, for Radarr, MinimumAvailability are the
-// defaults for adding Titles to it.
+// name), RootFolder (a path), for Radarr MinimumAvailability, and for Sonarr
+// Monitor (which episodes of a Series to monitor) are the defaults for adding
+// Titles to it.
 type Instance struct {
 	Name           string `toml:"name"`
 	App            App    `toml:"app"`
@@ -51,6 +52,7 @@ type Instance struct {
 	RootFolder     string `toml:"root_folder"`
 
 	MinimumAvailability string `toml:"minimum_availability"`
+	Monitor             string `toml:"monitor"`
 }
 
 // Path returns the config file path: $ARR_CLI_CONFIG if set, otherwise

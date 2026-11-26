@@ -316,11 +316,19 @@ type Series struct {
 	ID         int              `json:"id"`
 	Title      string           `json:"title"`
 	SortTitle  string           `json:"sortTitle"`
+	TitleSlug  string           `json:"titleSlug"`
 	Year       int              `json:"year"`
 	Status     string           `json:"status"`
 	Monitored  bool             `json:"monitored"`
 	TvdbID     int              `json:"tvdbId"`
+	Seasons    []Season         `json:"seasons"`
 	Statistics SeriesStatistics `json:"statistics"`
+}
+
+// Season is one season of a Series. Season 0 holds the specials.
+type Season struct {
+	SeasonNumber int  `json:"seasonNumber"`
+	Monitored    bool `json:"monitored"`
 }
 
 // SeriesStatistics counts a Series' seasons and the episodes on disk.
@@ -351,6 +359,22 @@ func (c *Client) LookupSeries(ctx context.Context, term string) ([]Series, error
 	var series []Series
 	err := c.get(ctx, "series/lookup", url.Values{"term": {term}}, &series)
 	return series, err
+}
+
+// LookupSeriesByTVDB asks a Sonarr Instance for the Candidate with TVDB ID
+// id. Its ID is the Series' Library ID when the Series is in the Library. A
+// TVDB ID the App does not know is an error.
+func (c *Client) LookupSeriesByTVDB(ctx context.Context, id int) (Series, error) {
+	series, err := c.LookupSeries(ctx, "tvdb:"+strconv.Itoa(id))
+	if err != nil {
+		return Series{}, err
+	}
+	for _, s := range series {
+		if s.TvdbID == id {
+			return s, nil
+		}
+	}
+	return Series{}, fmt.Errorf("no Series with TVDB ID %d", id)
 }
 
 // LookupMovieByTMDB asks a Radarr Instance for the Candidate with TMDB ID id.
@@ -452,6 +476,60 @@ func (c *Client) AddMovie(ctx context.Context, m NewMovie) (Movie, error) {
 		Monitored:           true,
 		MinimumAvailability: m.MinimumAvailability,
 		AddOptions:          addOptions{Monitor: "movieOnly", SearchForMovie: m.Search},
+	}, &added)
+	return added, err
+}
+
+// MonitorOptions are the values Sonarr takes for which episodes of a Series
+// to monitor when it is added.
+var MonitorOptions = []string{"all", "future", "missing", "existing", "firstSeason", "latestSeason", "none"}
+
+// NewSeries is a Candidate to add to a Sonarr Instance's Library, with where
+// and how to keep it. Monitor is one of MonitorOptions. Search starts a search
+// for the monitored episodes missing once it is added.
+type NewSeries struct {
+	Candidate        Series
+	QualityProfileID int
+	RootFolderPath   string
+	Monitor          string
+	Search           bool
+}
+
+// AddSeries adds a Series to a Sonarr Instance's Library, monitored and kept
+// in season folders, and returns it as it is now in the Library. Which
+// episodes are monitored follows s.Monitor.
+func (c *Client) AddSeries(ctx context.Context, s NewSeries) (Series, error) {
+	type addOptions struct {
+		Monitor                  string `json:"monitor"`
+		SearchForMissingEpisodes bool   `json:"searchForMissingEpisodes"`
+	}
+	seasons := s.Candidate.Seasons
+	if seasons == nil {
+		seasons = []Season{}
+	}
+	var added Series
+	err := c.post(ctx, "series", struct {
+		Title            string     `json:"title"`
+		TitleSlug        string     `json:"titleSlug,omitempty"`
+		Year             int        `json:"year"`
+		TvdbID           int        `json:"tvdbId"`
+		QualityProfileID int        `json:"qualityProfileId"`
+		RootFolderPath   string     `json:"rootFolderPath"`
+		Monitored        bool       `json:"monitored"`
+		SeasonFolder     bool       `json:"seasonFolder"`
+		Seasons          []Season   `json:"seasons"`
+		AddOptions       addOptions `json:"addOptions"`
+	}{
+		Title:            s.Candidate.Title,
+		TitleSlug:        s.Candidate.TitleSlug,
+		Year:             s.Candidate.Year,
+		TvdbID:           s.Candidate.TvdbID,
+		QualityProfileID: s.QualityProfileID,
+		RootFolderPath:   s.RootFolderPath,
+		Monitored:        true,
+		SeasonFolder:     true,
+		Seasons:          seasons,
+		AddOptions:       addOptions{Monitor: s.Monitor, SearchForMissingEpisodes: s.Search},
 	}, &added)
 	return added, err
 }

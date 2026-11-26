@@ -128,7 +128,10 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd.AddCommand(newCalendarCmd(only, flags))
 	cmd.AddCommand(newListCmd(only, flags))
 	cmd.AddCommand(newSearchCmd(inst, flags))
-	if inst.App == config.Radarr {
+	switch inst.App {
+	case config.Sonarr:
+		cmd.AddCommand(newAddSeriesCmd(inst, flags))
+	case config.Radarr:
 		cmd.AddCommand(newAddMovieCmd(inst, flags))
 	}
 	return cmd
