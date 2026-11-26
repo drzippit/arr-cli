@@ -16,7 +16,7 @@ import (
 
 // Run executes arr with args and returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
-	root, err := newRootCmd(stdout, stderr)
+	root, err := newRootCmd(stdout, stderr, args)
 	if err != nil {
 		fmt.Fprintln(stderr, "arr:", err)
 		return 1
@@ -45,7 +45,11 @@ type globalFlags struct {
 // keeps loading if it becomes a top-level command.
 var reservedWithoutCommand = []string{"search"}
 
-func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
+// newRootCmd builds the command tree for running arr with args. A config that
+// cannot be loaded is an error, except when args ask for shell completion:
+// then the tree has the top-level commands only, so a completion script can
+// still be printed and TAB still offers them.
+func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error) {
 	flags := &globalFlags{}
 	root := &cobra.Command{
 		Use:           "arr",
@@ -75,6 +79,9 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 		root.Long = fmt.Sprintf("No config found at %s; add an Instance with arr config add, or set %s.", src.path, config.EnvVar)
 		src.missing = true
 		return root, nil
+	case err != nil && completing(args):
+		src.loadErr = err
+		return root, nil
 	case err != nil:
 		return nil, err
 	}
@@ -84,6 +91,20 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 		root.AddCommand(newInstanceCmd(inst, flags))
 	}
 	return root, nil
+}
+
+// completing reports whether args ask for shell completion: a completion
+// script, or the words a script offers at TAB.
+func completing(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	switch args[0] {
+	// "completion" is the command root.InitDefaultCompletionCmd adds.
+	case "completion", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+		return true
+	}
+	return false
 }
 
 // reservedNames returns every top-level command name and alias, and the names
@@ -105,11 +126,14 @@ type instanceSource struct {
 	path      string
 	reserved  []string
 	missing   bool
+	loadErr   error // why the config did not load, when completing anyway
 	instances []config.Instance
 }
 
 func (s *instanceSource) all() ([]config.Instance, error) {
 	switch {
+	case s.loadErr != nil:
+		return nil, s.loadErr
 	case s.missing:
 		return nil, fmt.Errorf("no config found at %s; add an Instance with arr config add, or set %s", s.path, config.EnvVar)
 	case len(s.instances) == 0:
