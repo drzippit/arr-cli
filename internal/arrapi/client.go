@@ -182,6 +182,7 @@ type CalendarEpisode struct {
 	Title         string         `json:"title"`
 	AirDateUTC    time.Time      `json:"airDateUtc"`
 	HasFile       bool           `json:"hasFile"`
+	Monitored     bool           `json:"monitored"`
 	Series        *SeriesSummary `json:"series"`
 }
 
@@ -194,29 +195,33 @@ type CalendarMovie struct {
 	DigitalRelease  *time.Time `json:"digitalRelease"`
 	PhysicalRelease *time.Time `json:"physicalRelease"`
 	HasFile         bool       `json:"hasFile"`
+	Monitored       bool       `json:"monitored"`
 }
 
-// EpisodeCalendar fetches the episodes a Sonarr Instance expects to air
-// between start and end.
-func (c *Client) EpisodeCalendar(ctx context.Context, start, end time.Time) ([]CalendarEpisode, error) {
+// EpisodeCalendar fetches the monitored episodes a Sonarr Instance expects to
+// air between start and end, and the unmonitored ones too if unmonitored is
+// set.
+func (c *Client) EpisodeCalendar(ctx context.Context, start, end time.Time, unmonitored bool) ([]CalendarEpisode, error) {
 	var eps []CalendarEpisode
-	q := calendarQuery(start, end)
+	q := calendarQuery(start, end, unmonitored)
 	q.Set("includeSeries", "true")
 	err := c.get(ctx, "calendar", q, &eps)
 	return eps, err
 }
 
-// MovieCalendar fetches the Movies a Radarr Instance expects to release
-// between start and end.
-func (c *Client) MovieCalendar(ctx context.Context, start, end time.Time) ([]CalendarMovie, error) {
+// MovieCalendar fetches the monitored Movies a Radarr Instance expects to
+// release between start and end, and the unmonitored ones too if unmonitored
+// is set.
+func (c *Client) MovieCalendar(ctx context.Context, start, end time.Time, unmonitored bool) ([]CalendarMovie, error) {
 	var movies []CalendarMovie
-	err := c.get(ctx, "calendar", calendarQuery(start, end), &movies)
+	err := c.get(ctx, "calendar", calendarQuery(start, end, unmonitored), &movies)
 	return movies, err
 }
 
-func calendarQuery(start, end time.Time) url.Values {
+func calendarQuery(start, end time.Time, unmonitored bool) url.Values {
 	return url.Values{
-		"start": {start.UTC().Format(time.RFC3339)},
-		"end":   {end.UTC().Format(time.RFC3339)},
+		"start":       {start.UTC().Format(time.RFC3339)},
+		"end":         {end.UTC().Format(time.RFC3339)},
+		"unmonitored": {strconv.FormatBool(unmonitored)},
 	}
 }
