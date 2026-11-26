@@ -1,0 +1,44 @@
+[
+  {
+    "title": "The Matrix",
+    "originalTitle": "The Matrix",
+    "sortTitle": "matrix",
+    "sizeOnDisk": 8589934592,
+    "status": "released",
+    "year": 1999,
+    "hasFile": true,
+    "monitored": true,
+    "studio": "Warner Bros. Pictures",
+    "tmdbId": 603,
+    "imdbId": "tt0133093",
+    "id": 2
+  },
+  {
+    "title": "Good Will Hunting",
+    "originalTitle": "Good Will Hunting",
+    "sortTitle": "good will hunting",
+    "sizeOnDisk": 0,
+    "status": "released",
+    "year": 1997,
+    "hasFile": false,
+    "monitored": true,
+    "studio": "Miramax",
+    "tmdbId": 489,
+    "imdbId": "tt0119217",
+    "id": 1
+  },
+  {
+    "title": "Project Hail Mary",
+    "originalTitle": "Project Hail Mary",
+    "sortTitle": "project hail mary",
+    "sizeOnDisk": 0,
+    "status": "released",
+    "year": 2026,
+    "hasFile": false,
+    "monitored": false,
+    "studio": "Amazon MGM Studios",
+    "tmdbId": 687163,
+    "imdbId": "tt12042730",
+    "id": 81
+  }
+]
