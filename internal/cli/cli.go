@@ -129,7 +129,7 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd.AddCommand(newListCmd(only, flags))
 	cmd.AddCommand(newSearchCmd(inst, flags))
 	if inst.App == config.Radarr {
-		cmd.AddCommand(newAddMovieCmd(inst))
+		cmd.AddCommand(newAddMovieCmd(inst, flags))
 	}
 	return cmd
 }

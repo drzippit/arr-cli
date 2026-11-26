@@ -16,11 +16,11 @@ import (
 
 // newAddMovieCmd builds `arr <radarr-instance> add`, which adds a Movie to
 // the Instance's Library, monitored, from a query or a TMDB ID.
-func newAddMovieCmd(inst config.Instance) *cobra.Command {
+func newAddMovieCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	var (
-		tmdbID        int
-		quality, root string
-		noSearch      bool
+		tmdbID                      int
+		quality, root, availability string
+		noSearch                    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "add [query]",
@@ -45,6 +45,10 @@ func newAddMovieCmd(inst config.Instance) *cobra.Command {
 				stderr: cmd.ErrOrStderr(),
 			}
 
+			minAvailability, err := minimumAvailability(cmp.Or(availability, inst.MinimumAvailability, "released"))
+			if err != nil {
+				return err
+			}
 			movie, err := a.pickMovie(ctx, query, tmdbID)
 			if err != nil {
 				return err
@@ -52,7 +56,7 @@ func newAddMovieCmd(inst config.Instance) *cobra.Command {
 			if movie.ID != 0 {
 				return fmt.Errorf("%s is already in library", titleWithYear(movie.Title, movie.Year))
 			}
-			profileID, err := a.qualityProfile(ctx, quality)
+			profile, err := a.qualityProfile(ctx, quality)
 			if err != nil {
 				return err
 			}
@@ -60,14 +64,30 @@ func newAddMovieCmd(inst config.Instance) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			err = a.client.AddMovie(ctx, arrapi.NewMovie{
-				Candidate:        movie,
-				QualityProfileID: profileID,
-				RootFolderPath:   rootPath,
-				Search:           !noSearch,
+			added, err := a.client.AddMovie(ctx, arrapi.NewMovie{
+				Candidate:           movie,
+				QualityProfileID:    profile.ID,
+				RootFolderPath:      rootPath,
+				MinimumAvailability: minAvailability,
+				Search:              !noSearch,
 			})
 			if err != nil {
 				return err
+			}
+			if flags.json {
+				return renderJSONValue(cmd.OutOrStdout(), addedMovieRecord{
+					Instance:            inst.Name,
+					App:                 inst.App,
+					ID:                  added.ID,
+					Title:               movie.Title,
+					Year:                movie.Year,
+					TmdbID:              movie.TmdbID,
+					QualityProfile:      profile.Name,
+					RootFolder:          rootPath,
+					MinimumAvailability: minAvailability,
+					Monitored:           true,
+					Searching:           !noSearch,
+				})
 			}
 			msg := fmt.Sprintf("Added %s to %s", titleWithYear(movie.Title, movie.Year), inst.Name)
 			if noSearch {
@@ -83,8 +103,35 @@ func newAddMovieCmd(inst config.Instance) *cobra.Command {
 	f.IntVar(&tmdbID, "tmdb", 0, "add the Movie with this TMDB ID instead of searching")
 	f.StringVar(&quality, "quality", "", "name of the quality profile (default: quality_profile in the config)")
 	f.StringVar(&root, "root", "", "root folder to keep the Movie in (default: root_folder in the config)")
+	f.StringVar(&availability, "availability", "", "when the Movie counts as available: announced, inCinemas or released (default: minimum_availability in the config, else released)")
 	f.BoolVar(&noSearch, "no-search", false, "add the Movie without searching for it")
 	return cmd
+}
+
+// addedMovieRecord is a Movie add put in the Library, for --json. ID is its
+// ID in the Library.
+type addedMovieRecord struct {
+	Instance            string     `json:"instance"`
+	App                 config.App `json:"app"`
+	ID                  int        `json:"id"`
+	Title               string     `json:"title"`
+	Year                int        `json:"year,omitempty"`
+	TmdbID              int        `json:"tmdbId"`
+	QualityProfile      string     `json:"qualityProfile"`
+	RootFolder          string     `json:"rootFolder"`
+	MinimumAvailability string     `json:"minimumAvailability"`
+	Monitored           bool       `json:"monitored"`
+	Searching           bool       `json:"searching"`
+}
+
+// minimumAvailability returns Radarr's spelling of value, one of
+// arrapi.MinimumAvailabilities, ignoring case.
+func minimumAvailability(value string) (string, error) {
+	i := slices.IndexFunc(arrapi.MinimumAvailabilities, func(v string) bool { return strings.EqualFold(v, value) })
+	if i < 0 {
+		return "", fmt.Errorf("minimum availability %q is not one of %s", value, strings.Join(arrapi.MinimumAvailabilities, ", "))
+	}
+	return arrapi.MinimumAvailabilities[i], nil
 }
 
 // adder holds what adding a Title to one Instance needs. choose is nil when
@@ -159,12 +206,12 @@ func candidateLabel(r candidateRecord) string {
 	return strings.Join(parts, " · ")
 }
 
-// qualityProfile returns the ID of the quality profile named by flag, or else
-// by the Instance's config, or else picked at the terminal.
-func (a *adder) qualityProfile(ctx context.Context, flag string) (int, error) {
+// qualityProfile returns the quality profile named by flag, or else by the
+// Instance's config, or else picked at the terminal.
+func (a *adder) qualityProfile(ctx context.Context, flag string) (arrapi.QualityProfile, error) {
 	profiles, err := a.client.QualityProfiles(ctx)
 	if err != nil {
-		return 0, err
+		return arrapi.QualityProfile{}, err
 	}
 	names := make([]string, len(profiles))
 	for i, p := range profiles {
@@ -175,9 +222,9 @@ func (a *adder) qualityProfile(ctx context.Context, flag string) (int, error) {
 		value: cmp.Or(flag, a.inst.QualityProfile), options: names, matches: strings.EqualFold,
 	})
 	if err != nil {
-		return 0, err
+		return arrapi.QualityProfile{}, err
 	}
-	return profiles[i].ID, nil
+	return profiles[i], nil
 }
 
 // rootFolder returns the root folder given by flag, or else by the

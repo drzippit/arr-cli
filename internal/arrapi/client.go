@@ -151,9 +151,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, into an
 	return nil
 }
 
-// post sends body as JSON to path and expects 201 Created. When the App
-// rejects the body, the error gives the App's own reasons.
-func (c *Client) post(ctx context.Context, path string, body any) error {
+// post sends body as JSON to path, expects 201 Created and decodes the
+// answer into into. When the App rejects the body, the error gives the App's
+// own reasons.
+func (c *Client) post(ctx context.Context, path string, body, into any) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -163,9 +164,15 @@ func (c *Client) post(ctx context.Context, path string, body any) error {
 		return err
 	}
 	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return err
+	}
 	switch resp.StatusCode {
 	case http.StatusCreated, http.StatusOK:
+		if err := json.Unmarshal(respBody, into); err != nil {
+			return fmt.Errorf("POST %s: decode response: %w", endpoint(path), err)
+		}
 		return nil
 	case http.StatusBadRequest:
 		if reasons := validationErrors(respBody); len(reasons) > 0 {
@@ -401,23 +408,31 @@ func (c *Client) RootFolders(ctx context.Context) ([]RootFolder, error) {
 	return fs, err
 }
 
+// MinimumAvailabilities are the values Radarr takes for when a Movie counts
+// as available to download.
+var MinimumAvailabilities = []string{"announced", "inCinemas", "released"}
+
 // NewMovie is a Candidate to add to a Radarr Instance's Library, with where
-// and how to keep it. Search starts a search for the Movie once it is added.
+// and how to keep it. MinimumAvailability is one of MinimumAvailabilities.
+// Search starts a search for the Movie once it is added.
 type NewMovie struct {
-	Candidate        Movie
-	QualityProfileID int
-	RootFolderPath   string
-	Search           bool
+	Candidate           Movie
+	QualityProfileID    int
+	RootFolderPath      string
+	MinimumAvailability string
+	Search              bool
 }
 
 // AddMovie adds a Movie to a Radarr Instance's Library, monitored, so that
-// it is downloaded once it is released.
-func (c *Client) AddMovie(ctx context.Context, m NewMovie) error {
+// it is downloaded once it is available, and returns it as it is now in the
+// Library.
+func (c *Client) AddMovie(ctx context.Context, m NewMovie) (Movie, error) {
 	type addOptions struct {
 		Monitor        string `json:"monitor"`
 		SearchForMovie bool   `json:"searchForMovie"`
 	}
-	return c.post(ctx, "movie", struct {
+	var added Movie
+	err := c.post(ctx, "movie", struct {
 		Title               string     `json:"title"`
 		TitleSlug           string     `json:"titleSlug,omitempty"`
 		Year                int        `json:"year"`
@@ -435,7 +450,8 @@ func (c *Client) AddMovie(ctx context.Context, m NewMovie) error {
 		QualityProfileID:    m.QualityProfileID,
 		RootFolderPath:      m.RootFolderPath,
 		Monitored:           true,
-		MinimumAvailability: "released",
+		MinimumAvailability: m.MinimumAvailability,
 		AddOptions:          addOptions{Monitor: "movieOnly", SearchForMovie: m.Search},
-	})
+	}, &added)
+	return added, err
 }

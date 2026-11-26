@@ -35,7 +35,12 @@ func renderJSON[T any](w io.Writer, records []T) error {
 	if records == nil {
 		records = []T{}
 	}
+	return renderJSONValue(w, records)
+}
+
+// renderJSONValue writes v as indented JSON.
+func renderJSONValue(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(records)
+	return enc.Encode(v)
 }
