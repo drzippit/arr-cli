@@ -31,6 +31,7 @@ func recordedHandler(t *testing.T, app string) http.Handler {
 	routes := map[string]string{
 		"/api/v3/system/status": "system_status.json",
 		"/api/v3/health":        "health.json",
+		"/api/v3/queue":         "queue.json",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Api-Key") != testAPIKey {

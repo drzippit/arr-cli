@@ -1,0 +1,39 @@
+{
+  "page": 1,
+  "pageSize": 1000,
+  "sortKey": "timeleft",
+  "sortDirection": "ascending",
+  "totalRecords": 1,
+  "records": [
+    {
+      "movieId": 77,
+      "movie": {
+        "title": "Good Will Hunting",
+        "sortTitle": "good will hunting",
+        "year": 1997,
+        "id": 77
+      },
+      "size": 10737418240,
+      "title": "Good.Will.Hunting.1997.1080p.WEB-DL-SAMPLEGRP",
+      "sizeleft": 1073741824,
+      "timeleft": "1.02:03:04",
+      "estimatedCompletionTime": "2026-11-27T16:03:04Z",
+      "added": "2026-11-26T12:00:00Z",
+      "status": "warning",
+      "trackedDownloadStatus": "warning",
+      "trackedDownloadState": "downloading",
+      "statusMessages": [
+        {
+          "title": "Good.Will.Hunting.1997.1080p.WEB-DL-SAMPLEGRP",
+          "messages": ["Download is stalled"]
+        }
+      ],
+      "downloadId": "F6E5D4C3B2A1",
+      "protocol": "torrent",
+      "downloadClient": "qBittorrent",
+      "downloadClientHasPostImportCategory": false,
+      "indexer": "Example Tracker",
+      "id": 450
+    }
+  ]
+}

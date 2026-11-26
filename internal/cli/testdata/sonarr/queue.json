@@ -1,0 +1,77 @@
+{
+  "page": 1,
+  "pageSize": 1000,
+  "sortKey": "timeleft",
+  "sortDirection": "ascending",
+  "totalRecords": 2,
+  "records": [
+    {
+      "seriesId": 12,
+      "episodeId": 3401,
+      "seasonNumber": 2,
+      "series": {
+        "title": "Severance",
+        "sortTitle": "severance",
+        "year": 2022,
+        "id": 12
+      },
+      "episode": {
+        "seriesId": 12,
+        "seasonNumber": 2,
+        "episodeNumber": 7,
+        "title": "Chikhai Bardo",
+        "id": 3401
+      },
+      "size": 2147483648,
+      "title": "Severance.S02E07.1080p.WEB-DL-EXAMPLE",
+      "sizeleft": 1610612736,
+      "timeleft": "00:12:34",
+      "estimatedCompletionTime": "2026-11-26T14:12:34Z",
+      "added": "2026-11-26T13:50:00Z",
+      "status": "downloading",
+      "trackedDownloadStatus": "ok",
+      "trackedDownloadState": "downloading",
+      "statusMessages": [],
+      "downloadId": "SABnzbd_nzo_abc123",
+      "protocol": "usenet",
+      "downloadClient": "SABnzbd",
+      "downloadClientHasPostImportCategory": false,
+      "indexer": "Example Indexer",
+      "episodeHasFile": false,
+      "id": 901
+    },
+    {
+      "seriesId": 30,
+      "episodeId": 5120,
+      "seasonNumber": 1,
+      "series": {
+        "title": "Shōgun",
+        "sortTitle": "shogun",
+        "year": 2024,
+        "id": 30
+      },
+      "episode": {
+        "seriesId": 30,
+        "seasonNumber": 1,
+        "episodeNumber": 10,
+        "title": "A Dream of a Dream",
+        "id": 5120
+      },
+      "size": 4294967296,
+      "title": "Shogun.2024.S01E10.2160p.WEB-DL-EXAMPLE",
+      "sizeleft": 4294967296,
+      "added": "2026-11-26T13:55:00Z",
+      "status": "queued",
+      "trackedDownloadStatus": "ok",
+      "trackedDownloadState": "downloading",
+      "statusMessages": [],
+      "downloadId": "A1B2C3D4E5F6",
+      "protocol": "torrent",
+      "downloadClient": "qBittorrent",
+      "downloadClientHasPostImportCategory": false,
+      "indexer": "Example Tracker",
+      "episodeHasFile": false,
+      "id": 902
+    }
+  ]
+}
