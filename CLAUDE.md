@@ -13,3 +13,7 @@ Uses the five default triage labels: `needs-triage`, `needs-info`, `ready-for-ag
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Integration tests
+
+A command that calls an App gets a `TestIntegration…` case when it is added or changed; `make integration` runs them against real Instances in Docker. See `docs/integration-tests.md`.
