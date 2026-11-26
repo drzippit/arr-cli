@@ -3,8 +3,11 @@
 package arrapi
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -132,18 +135,7 @@ func (c *Client) Queue(ctx context.Context) ([]QueueItem, error) {
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, into any) error {
-	u := c.baseURL + endpoint(path)
-	if len(query) > 0 {
-		u += "?" + query.Encode()
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("X-Api-Key", c.apiKey)
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := c.httpc.Do(req)
+	resp, err := c.do(ctx, http.MethodGet, path, query, nil)
 	if err != nil {
 		return err
 	}
@@ -159,14 +151,76 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, into an
 	return nil
 }
 
-// StatusError means the Instance answered, but not with 200 OK.
+// post sends body as JSON to path and expects 201 Created. When the App
+// rejects the body, the error gives the App's own reasons.
+func (c *Client) post(ctx context.Context, path string, body any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(ctx, http.MethodPost, path, nil, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	switch resp.StatusCode {
+	case http.StatusCreated, http.StatusOK:
+		return nil
+	case http.StatusBadRequest:
+		if reasons := validationErrors(respBody); len(reasons) > 0 {
+			return fmt.Errorf("POST %s: %s", endpoint(path), strings.Join(reasons, "; "))
+		}
+	}
+	return &StatusError{Method: http.MethodPost, Path: path, Code: resp.StatusCode}
+}
+
+// do sends one authenticated request to path. A body is sent as JSON.
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, body io.Reader) (*http.Response, error) {
+	u := c.baseURL + endpoint(path)
+	if len(query) > 0 {
+		u += "?" + query.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("X-Api-Key", c.apiKey)
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	return c.httpc.Do(req)
+}
+
+// validationErrors reads the reasons an App gives for rejecting a request
+// body, if it gave any.
+func validationErrors(body []byte) []string {
+	var failures []struct {
+		ErrorMessage string `json:"errorMessage"`
+	}
+	if json.Unmarshal(body, &failures) != nil {
+		return nil
+	}
+	var reasons []string
+	for _, f := range failures {
+		if f.ErrorMessage != "" {
+			reasons = append(reasons, f.ErrorMessage)
+		}
+	}
+	return reasons
+}
+
+// StatusError means the Instance answered, but not with the status the
+// request expects. Method is empty for GET.
 type StatusError struct {
-	Path string
-	Code int
+	Method string
+	Path   string
+	Code   int
 }
 
 func (e *StatusError) Error() string {
-	msg := fmt.Sprintf("GET %s: %d %s", endpoint(e.Path), e.Code, http.StatusText(e.Code))
+	msg := fmt.Sprintf("%s %s: %d %s", cmp.Or(e.Method, http.MethodGet), endpoint(e.Path), e.Code, http.StatusText(e.Code))
 	if e.Code == http.StatusUnauthorized {
 		msg += " (check the API key)"
 	}
@@ -232,6 +286,7 @@ type Movie struct {
 	ID         int    `json:"id"`
 	Title      string `json:"title"`
 	SortTitle  string `json:"sortTitle"`
+	TitleSlug  string `json:"titleSlug"`
 	Year       int    `json:"year"`
 	Status     string `json:"status"`
 	Monitored  bool   `json:"monitored"`
@@ -289,4 +344,98 @@ func (c *Client) LookupSeries(ctx context.Context, term string) ([]Series, error
 	var series []Series
 	err := c.get(ctx, "series/lookup", url.Values{"term": {term}}, &series)
 	return series, err
+}
+
+// LookupMovieByTMDB asks a Radarr Instance for the Candidate with TMDB ID id.
+// Radarr builds it afresh from TMDB, so its ID is 0 even when the Movie is in
+// the Library; LibraryMovieByTMDB tells. A TMDB ID the App does not know is
+// an error.
+func (c *Client) LookupMovieByTMDB(ctx context.Context, id int) (Movie, error) {
+	var m Movie
+	err := c.get(ctx, "movie/lookup/tmdb", url.Values{"tmdbId": {strconv.Itoa(id)}}, &m)
+	var se *StatusError
+	if (errors.As(err, &se) && se.Code == http.StatusNotFound) || (err == nil && m.TmdbID == 0) {
+		return Movie{}, fmt.Errorf("no Movie with TMDB ID %d", id)
+	}
+	return m, err
+}
+
+// LibraryMovieByTMDB returns the Movie with TMDB ID id in a Radarr Instance's
+// Library, and whether there is one.
+func (c *Client) LibraryMovieByTMDB(ctx context.Context, id int) (Movie, bool, error) {
+	var movies []Movie
+	if err := c.get(ctx, "movie", url.Values{"tmdbId": {strconv.Itoa(id)}}, &movies); err != nil {
+		return Movie{}, false, err
+	}
+	// Filter here too, in case the Instance ignores tmdbId and sends every Movie.
+	for _, m := range movies {
+		if m.TmdbID == id {
+			return m, true, nil
+		}
+	}
+	return Movie{}, false, nil
+}
+
+// QualityProfile is one of an Instance's quality profiles.
+type QualityProfile struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// QualityProfiles fetches the Instance's quality profiles.
+func (c *Client) QualityProfiles(ctx context.Context) ([]QualityProfile, error) {
+	var ps []QualityProfile
+	err := c.get(ctx, "qualityprofile", nil, &ps)
+	return ps, err
+}
+
+// RootFolder is one of the folders an Instance keeps its Titles in.
+type RootFolder struct {
+	Path string `json:"path"`
+}
+
+// RootFolders fetches the Instance's root folders.
+func (c *Client) RootFolders(ctx context.Context) ([]RootFolder, error) {
+	var fs []RootFolder
+	err := c.get(ctx, "rootfolder", nil, &fs)
+	return fs, err
+}
+
+// NewMovie is a Candidate to add to a Radarr Instance's Library, with where
+// and how to keep it. Search starts a search for the Movie once it is added.
+type NewMovie struct {
+	Candidate        Movie
+	QualityProfileID int
+	RootFolderPath   string
+	Search           bool
+}
+
+// AddMovie adds a Movie to a Radarr Instance's Library, monitored, so that
+// it is downloaded once it is released.
+func (c *Client) AddMovie(ctx context.Context, m NewMovie) error {
+	type addOptions struct {
+		Monitor        string `json:"monitor"`
+		SearchForMovie bool   `json:"searchForMovie"`
+	}
+	return c.post(ctx, "movie", struct {
+		Title               string     `json:"title"`
+		TitleSlug           string     `json:"titleSlug,omitempty"`
+		Year                int        `json:"year"`
+		TmdbID              int        `json:"tmdbId"`
+		QualityProfileID    int        `json:"qualityProfileId"`
+		RootFolderPath      string     `json:"rootFolderPath"`
+		Monitored           bool       `json:"monitored"`
+		MinimumAvailability string     `json:"minimumAvailability"`
+		AddOptions          addOptions `json:"addOptions"`
+	}{
+		Title:               m.Candidate.Title,
+		TitleSlug:           m.Candidate.TitleSlug,
+		Year:                m.Candidate.Year,
+		TmdbID:              m.Candidate.TmdbID,
+		QualityProfileID:    m.QualityProfileID,
+		RootFolderPath:      m.RootFolderPath,
+		Monitored:           true,
+		MinimumAvailability: "released",
+		AddOptions:          addOptions{Monitor: "movieOnly", SearchForMovie: m.Search},
+	})
 }

@@ -1,0 +1,4 @@
+[
+  { "id": 1, "path": "/movies", "accessible": true, "freeSpace": 500000000000 },
+  { "id": 2, "path": "/movies-4k", "accessible": true, "freeSpace": 900000000000 }
+]
