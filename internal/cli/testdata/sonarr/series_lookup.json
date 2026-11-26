@@ -1,0 +1,19 @@
+[
+  {
+    "title": "Twin Peaks",
+    "sortTitle": "twin peaks",
+    "status": "ended",
+    "year": 1990,
+    "tvdbId": 70533,
+    "id": 3,
+    "path": "/tv/Twin Peaks"
+  },
+  {
+    "title": "Twin Peaks (2017)",
+    "sortTitle": "twin peaks 2017",
+    "status": "ended",
+    "year": 2017,
+    "tvdbId": 301474,
+    "folder": "Twin Peaks (2017)"
+  }
+]

@@ -1,0 +1,31 @@
+[
+  {
+    "title": "The Matrix",
+    "sortTitle": "matrix",
+    "year": 1999,
+    "status": "released",
+    "tmdbId": 603,
+    "id": 2,
+    "monitored": true,
+    "hasFile": true
+  },
+  {
+    "title": "The Matrix Reloaded",
+    "sortTitle": "matrix reloaded",
+    "year": 2003,
+    "status": "released",
+    "tmdbId": 604,
+    "id": 0,
+    "monitored": false,
+    "hasFile": false
+  },
+  {
+    "title": "The Matrix Resurrections",
+    "sortTitle": "matrix resurrections",
+    "year": 2021,
+    "status": "released",
+    "tmdbId": 624860,
+    "monitored": false,
+    "hasFile": false
+  }
+]

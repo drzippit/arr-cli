@@ -132,12 +132,17 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 func (r queueRecord) displayTitle() string { return titleWithYear(r.Title, r.Year) }
 
 // titleWithYear writes a Title as "Good Will Hunting (1997)", or just its name
-// when the year is unknown.
+// when the year is unknown or the name already ends with it, as in Sonarr's
+// "Twin Peaks (2017)".
 func titleWithYear(title string, year int) string {
-	if year > 0 {
-		return fmt.Sprintf("%s (%d)", title, year)
+	if year <= 0 {
+		return title
 	}
-	return title
+	suffix := fmt.Sprintf(" (%d)", year)
+	if strings.HasSuffix(title, suffix) {
+		return title
+	}
+	return title + suffix
 }
 
 func (r queueRecord) displayEpisode() string {

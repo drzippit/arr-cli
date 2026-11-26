@@ -35,6 +35,8 @@ func recordedHandler(t *testing.T, app string) http.Handler {
 		"/api/v3/calendar":      "calendar.json",
 		"/api/v3/series":        "series.json",
 		"/api/v3/movie":         "movie.json",
+		"/api/v3/series/lookup": "series_lookup.json",
+		"/api/v3/movie/lookup":  "movie_lookup.json",
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Api-Key") != testAPIKey {

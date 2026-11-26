@@ -226,8 +226,10 @@ func calendarQuery(start, end time.Time, unmonitored bool) url.Values {
 	}
 }
 
-// Movie is one Movie from Radarr's /api/v3/movie.
+// Movie is one Movie from Radarr's /api/v3/movie or /api/v3/movie/lookup. ID
+// is the Movie's ID in the Instance's Library, or 0 for a Candidate not in it.
 type Movie struct {
+	ID         int    `json:"id"`
 	Title      string `json:"title"`
 	SortTitle  string `json:"sortTitle"`
 	Year       int    `json:"year"`
@@ -245,8 +247,11 @@ func (c *Client) Movies(ctx context.Context) ([]Movie, error) {
 	return movies, err
 }
 
-// Series is one Series from Sonarr's /api/v3/series.
+// Series is one Series from Sonarr's /api/v3/series or /api/v3/series/lookup.
+// ID is the Series' ID in the Instance's Library, or 0 for a Candidate not in
+// it.
 type Series struct {
+	ID         int              `json:"id"`
 	Title      string           `json:"title"`
 	SortTitle  string           `json:"sortTitle"`
 	Year       int              `json:"year"`
@@ -269,5 +274,19 @@ type SeriesStatistics struct {
 func (c *Client) AllSeries(ctx context.Context) ([]Series, error) {
 	var series []Series
 	err := c.get(ctx, "series", nil, &series)
+	return series, err
+}
+
+// LookupMovies asks a Radarr Instance for the Candidates matching term.
+func (c *Client) LookupMovies(ctx context.Context, term string) ([]Movie, error) {
+	var movies []Movie
+	err := c.get(ctx, "movie/lookup", url.Values{"term": {term}}, &movies)
+	return movies, err
+}
+
+// LookupSeries asks a Sonarr Instance for the Candidates matching term.
+func (c *Client) LookupSeries(ctx context.Context, term string) ([]Series, error) {
+	var series []Series
+	err := c.get(ctx, "series/lookup", url.Values{"term": {term}}, &series)
 	return series, err
 }
