@@ -62,22 +62,22 @@ func (c *Client) Health(ctx context.Context) ([]HealthCheck, error) {
 // Sonarr, Movie by Radarr. Release is the name of the release being
 // downloaded, which the API calls its title.
 type QueueItem struct {
-	Release                 string        `json:"title"`
-	Series                  *QueueSeries  `json:"series"`
-	Episode                 *QueueEpisode `json:"episode"`
-	Movie                   *QueueMovie   `json:"movie"`
-	Size                    float64       `json:"size"`
-	SizeLeft                float64       `json:"sizeleft"`
-	TimeLeft                string        `json:"timeleft"`
-	EstimatedCompletionTime string        `json:"estimatedCompletionTime"`
-	Status                  string        `json:"status"`
-	TrackedDownloadState    string        `json:"trackedDownloadState"`
-	Protocol                string        `json:"protocol"`
-	DownloadClient          string        `json:"downloadClient"`
+	Release                 string         `json:"title"`
+	Series                  *SeriesSummary `json:"series"`
+	Episode                 *QueueEpisode  `json:"episode"`
+	Movie                   *QueueMovie    `json:"movie"`
+	Size                    float64        `json:"size"`
+	SizeLeft                float64        `json:"sizeleft"`
+	TimeLeft                string         `json:"timeleft"`
+	EstimatedCompletionTime string         `json:"estimatedCompletionTime"`
+	Status                  string         `json:"status"`
+	TrackedDownloadState    string         `json:"trackedDownloadState"`
+	Protocol                string         `json:"protocol"`
+	DownloadClient          string         `json:"downloadClient"`
 }
 
-// QueueSeries is the Series a Sonarr queue item belongs to.
-type QueueSeries struct {
+// SeriesSummary is the Series a Sonarr queue or calendar item belongs to.
+type SeriesSummary struct {
 	Title string `json:"title"`
 	Year  int    `json:"year"`
 }
@@ -174,3 +174,49 @@ func (e *StatusError) Error() string {
 }
 
 func endpoint(path string) string { return "/api/v3/" + path }
+
+// CalendarEpisode is one episode from Sonarr's /api/v3/calendar.
+type CalendarEpisode struct {
+	SeasonNumber  int            `json:"seasonNumber"`
+	EpisodeNumber int            `json:"episodeNumber"`
+	Title         string         `json:"title"`
+	AirDateUTC    time.Time      `json:"airDateUtc"`
+	HasFile       bool           `json:"hasFile"`
+	Series        *SeriesSummary `json:"series"`
+}
+
+// CalendarMovie is one Movie from Radarr's /api/v3/calendar. Each release
+// date is a calendar day, given as midnight UTC, and is nil when unknown.
+type CalendarMovie struct {
+	Title           string     `json:"title"`
+	Year            int        `json:"year"`
+	InCinemas       *time.Time `json:"inCinemas"`
+	DigitalRelease  *time.Time `json:"digitalRelease"`
+	PhysicalRelease *time.Time `json:"physicalRelease"`
+	HasFile         bool       `json:"hasFile"`
+}
+
+// EpisodeCalendar fetches the episodes a Sonarr Instance expects to air
+// between start and end.
+func (c *Client) EpisodeCalendar(ctx context.Context, start, end time.Time) ([]CalendarEpisode, error) {
+	var eps []CalendarEpisode
+	q := calendarQuery(start, end)
+	q.Set("includeSeries", "true")
+	err := c.get(ctx, "calendar", q, &eps)
+	return eps, err
+}
+
+// MovieCalendar fetches the Movies a Radarr Instance expects to release
+// between start and end.
+func (c *Client) MovieCalendar(ctx context.Context, start, end time.Time) ([]CalendarMovie, error) {
+	var movies []CalendarMovie
+	err := c.get(ctx, "calendar", calendarQuery(start, end), &movies)
+	return movies, err
+}
+
+func calendarQuery(start, end time.Time) url.Values {
+	return url.Values{
+		"start": {start.UTC().Format(time.RFC3339)},
+		"end":   {end.UTC().Format(time.RFC3339)},
+	}
+}

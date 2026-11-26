@@ -48,16 +48,7 @@ func newQueueCmd(instances func() ([]config.Instance, error), flags *globalFlags
 			if err != nil {
 				return err
 			}
-			results := forEachInstance(cmd.Context(), insts, fetchQueue)
-			var recs []queueRecord
-			var failures []failure
-			for i, res := range results {
-				if res.err != nil {
-					failures = append(failures, failure{insts[i].Name, res.err.Error()})
-					continue
-				}
-				recs = append(recs, res.recs...)
-			}
+			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchQueue))
 			if err := renderQueue(cmd.OutOrStdout(), recs, flags.json); err != nil {
 				return err
 			}
@@ -66,25 +57,20 @@ func newQueueCmd(instances func() ([]config.Instance, error), flags *globalFlags
 	}
 }
 
-type queueResult struct {
-	recs []queueRecord
-	err  error
-}
-
-func fetchQueue(ctx context.Context, inst config.Instance) queueResult {
+func fetchQueue(ctx context.Context, inst config.Instance) instanceResult[queueRecord] {
 	key, err := inst.ResolveAPIKey()
 	if err != nil {
-		return queueResult{err: err}
+		return instanceResult[queueRecord]{err: err}
 	}
 	items, err := arrapi.New(inst.URL, key).Queue(ctx)
 	if err != nil {
-		return queueResult{err: err}
+		return instanceResult[queueRecord]{err: err}
 	}
 	recs := make([]queueRecord, len(items))
 	for i, it := range items {
 		recs[i] = newQueueRecord(inst, it)
 	}
-	return queueResult{recs: recs}
+	return instanceResult[queueRecord]{recs: recs}
 }
 
 func newQueueRecord(inst config.Instance, it arrapi.QueueItem) queueRecord {

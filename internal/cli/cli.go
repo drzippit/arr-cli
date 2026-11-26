@@ -41,7 +41,7 @@ type globalFlags struct {
 
 // plannedCommands are top-level commands that do not exist yet. Their names
 // are reserved now so a config that loads today keeps loading when they land.
-var plannedCommands = []string{"calendar", "config"}
+var plannedCommands = []string{"config"}
 
 func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	flags := &globalFlags{}
@@ -60,6 +60,7 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	src := &instanceSource{path: config.Path()}
 	root.AddCommand(newStatusCmd(src.all, flags))
 	root.AddCommand(newQueueCmd(src.all, flags))
+	root.AddCommand(newCalendarCmd(src.all, flags))
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 
@@ -121,5 +122,6 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	only := func() ([]config.Instance, error) { return []config.Instance{inst}, nil }
 	cmd.AddCommand(newStatusCmd(only, flags))
 	cmd.AddCommand(newQueueCmd(only, flags))
+	cmd.AddCommand(newCalendarCmd(only, flags))
 	return cmd
 }

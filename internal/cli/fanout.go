@@ -38,3 +38,25 @@ func reportFailures(w io.Writer, failures []failure) error {
 	}
 	return nil
 }
+
+// instanceResult is what one Instance returned for a command that lists
+// records, or why it could not.
+type instanceResult[T any] struct {
+	recs []T
+	err  error
+}
+
+// gather joins the records from every Instance in config order and lists the
+// Instances that failed.
+func gather[T any](insts []config.Instance, results []instanceResult[T]) ([]T, []failure) {
+	var recs []T
+	var failures []failure
+	for i, res := range results {
+		if res.err != nil {
+			failures = append(failures, failure{insts[i].Name, res.err.Error()})
+			continue
+		}
+		recs = append(recs, res.recs...)
+	}
+	return recs, failures
+}
