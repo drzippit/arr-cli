@@ -3,10 +3,8 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
-	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -38,27 +36,21 @@ func newStatusCmd(instances func() ([]config.Instance, error), flags *globalFlag
 			if err != nil {
 				return err
 			}
-			recs := fetchStatusAll(cmd.Context(), insts)
+			recs := forEachInstance(cmd.Context(), insts, fetchStatus)
 			if err := renderStatus(cmd.OutOrStdout(), recs, verbose, flags.json); err != nil {
 				return err
 			}
-			return reportFailures(cmd.ErrOrStderr(), recs)
+			var failures []failure
+			for _, r := range recs {
+				if r.Error != "" {
+					failures = append(failures, failure{r.Instance, r.Error})
+				}
+			}
+			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "list each Warning")
 	return cmd
-}
-
-// fetchStatusAll asks every Instance at the same time and returns their
-// records in config order.
-func fetchStatusAll(ctx context.Context, insts []config.Instance) []statusRecord {
-	recs := make([]statusRecord, len(insts))
-	var wg sync.WaitGroup
-	for i, inst := range insts {
-		wg.Go(func() { recs[i] = fetchStatus(ctx, inst) })
-	}
-	wg.Wait()
-	return recs
 }
 
 func fetchStatus(ctx context.Context, inst config.Instance) statusRecord {
@@ -131,22 +123,6 @@ func renderStatus(w io.Writer, recs []statusRecord, verbose, asJSON bool) error 
 		return nil
 	}
 	return renderTable(w, []string{"INSTANCE", "TYPE", "SOURCE", "MESSAGE"}, warnings)
-}
-
-// reportFailures writes one line per failed Instance to w and returns a
-// silentError if there were any, so the exit code is non-zero.
-func reportFailures(w io.Writer, recs []statusRecord) error {
-	failed := 0
-	for _, r := range recs {
-		if r.Error != "" {
-			fmt.Fprintf(w, "arr: %s: %s\n", r.Instance, r.Error)
-			failed++
-		}
-	}
-	if failed > 0 {
-		return silentError{fmt.Errorf("%d Instance(s) failed", failed)}
-	}
-	return nil
 }
 
 func yesNo(b bool) string {
