@@ -61,6 +61,7 @@ func newRootCmd(stdout, stderr io.Writer) (*cobra.Command, error) {
 	root.AddCommand(newStatusCmd(src.all, flags))
 	root.AddCommand(newQueueCmd(src.all, flags))
 	root.AddCommand(newCalendarCmd(src.all, flags))
+	root.AddCommand(newListCmd(src.all, flags))
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
 
@@ -123,6 +124,6 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd.AddCommand(newStatusCmd(only, flags))
 	cmd.AddCommand(newQueueCmd(only, flags))
 	cmd.AddCommand(newCalendarCmd(only, flags))
-	cmd.AddCommand(newListCmd(inst, flags))
+	cmd.AddCommand(newListCmd(only, flags))
 	return cmd
 }

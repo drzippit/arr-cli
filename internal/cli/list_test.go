@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -247,4 +248,60 @@ func assertRow(t *testing.T, out string, cells ...string) {
 		return
 	}
 	t.Errorf("no row for %q:\n%s", cells[0], out)
+}
+
+func TestListWithoutInstanceCoversEveryLibraryDespiteFailures(t *testing.T) {
+	sonarr := fakeInstance(t, "sonarr")
+	down := fakeInstance(t, "radarr")
+	downURL := down.URL
+	down.Close()
+	radarr := fakeInstance(t, "radarr")
+	useConfig(t,
+		instanceDef{"sonarr", "sonarr", sonarr.URL, testAPIKey},
+		instanceDef{"radarr-old", "radarr", downURL, testAPIKey},
+		instanceDef{"radarr", "radarr", radarr.URL, testAPIKey},
+	)
+
+	out, stderr, code := run(t, "list")
+
+	if code != 1 {
+		t.Errorf("exit code %d, want 1 when an Instance fails", code)
+	}
+	if n := strings.Count(out, "INSTANCE"); n != 1 {
+		t.Errorf("want one combined table, got %d header rows:\n%s", n, out)
+	}
+	assertRow(t, out, "sonarr", "Severance (2022)")
+	assertRow(t, out, "radarr", "Good Will Hunting (1997)")
+	// Each Instance's Titles are sorted, and Instances come in config order.
+	assertInOrder(t, out, "Severance", "Shōgun", "Twin Peaks", "Good Will Hunting", "The Matrix", "Project Hail Mary")
+	if !strings.HasPrefix(stderr, "arr: radarr-old: ") || strings.Count(stderr, "\n") != 1 {
+		t.Errorf("stderr should name only the failed Instance, got %q", stderr)
+	}
+}
+
+func TestListWithoutInstanceFiltersAndPrintsJSON(t *testing.T) {
+	sonarr := fakeInstance(t, "sonarr")
+	radarr := fakeInstance(t, "radarr")
+	useConfig(t,
+		instanceDef{"sonarr", "sonarr", sonarr.URL, testAPIKey},
+		instanceDef{"radarr", "radarr", radarr.URL, testAPIKey},
+	)
+
+	out, stderr, code := run(t, "list", "in", "--json")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	var recs []struct{ Instance, App, Title string }
+	if err := json.Unmarshal([]byte(out), &recs); err != nil {
+		t.Fatalf("not a JSON array: %v\n%s", err, out)
+	}
+	var got []string
+	for _, r := range recs {
+		got = append(got, r.Instance+"/"+r.App+"/"+r.Title)
+	}
+	want := []string{"sonarr/sonarr/Twin Peaks", "radarr/radarr/Good Will Hunting"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("got %v, want %v", got, want)
+	}
 }
