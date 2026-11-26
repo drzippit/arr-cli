@@ -301,6 +301,16 @@ func TestInvalidConfigFailsBeforeRunning(t *testing.T) {
 	}
 }
 
+func TestConfigThatCannotBeParsedFailsBeforeRunning(t *testing.T) {
+	useUnparseableConfig(t)
+
+	_, stderr, code := run(t, "status")
+
+	if code == 0 || !strings.Contains(stderr, "parse ") {
+		t.Errorf("want the parse error, got exit %d, stderr %q", code, stderr)
+	}
+}
+
 func TestStatusMarksVersionOlderThanSupported(t *testing.T) {
 	srv := httptest.NewServer(runningVersion("Sonarr", "3.0.10.1567", recordedHandler(t, "sonarr")))
 	t.Cleanup(srv.Close)

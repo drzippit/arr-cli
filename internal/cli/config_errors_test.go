@@ -13,20 +13,9 @@ import (
 // completion sees them.
 func topLevelCommands(t *testing.T) []string {
 	t.Helper()
-	out, stderr, code := run(t, "__complete", "")
-	if code != 0 {
-		t.Fatalf("__complete failed: %s", stderr)
-	}
-	var names []string
-	for _, line := range strings.Split(out, "\n") {
-		if line == "" || strings.HasPrefix(line, ":") {
-			continue
-		}
-		name, _, _ := strings.Cut(line, "\t")
-		names = append(names, name)
-	}
+	names := complete(t, "")
 	if len(names) == 0 {
-		t.Fatalf("no top-level commands found in:\n%s", out)
+		t.Fatal("no top-level commands offered")
 	}
 	return names
 }
