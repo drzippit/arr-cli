@@ -16,7 +16,7 @@ import (
 // statusRecord is the status of one Instance.
 type statusRecord struct {
 	Instance  string               `json:"instance"`
-	App       string               `json:"app"`
+	App       config.App           `json:"app"`
 	Reachable bool                 `json:"reachable"`
 	Version   string               `json:"version"`
 	Warnings  *int                 `json:"warnings"`
@@ -100,7 +100,7 @@ func renderStatus(w io.Writer, recs []statusRecord, verbose, asJSON bool) error 
 	rows := make([][]string, 0, len(recs))
 	var warnings [][]string
 	for _, r := range recs {
-		rows = append(rows, []string{r.Instance, r.App, yesNo(r.Reachable), r.Version, countOrDash(r.Warnings)})
+		rows = append(rows, []string{r.Instance, string(r.App), yesNo(r.Reachable), r.Version, countOrDash(r.Warnings)})
 		for _, h := range r.Health {
 			warnings = append(warnings, []string{r.Instance, h.Type, h.Source, h.Message})
 		}
