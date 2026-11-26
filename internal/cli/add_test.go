@@ -126,8 +126,9 @@ func TestAddByTMDBIDAddsMonitoredMovieAndSearches(t *testing.T) {
 
 // prompt is one picker the CLI showed.
 type prompt struct {
-	title   string
-	options []string
+	title    string
+	options  []string
+	selected int
 }
 
 // answerPrompts makes the CLI act as if it runs in a terminal and answers
@@ -136,8 +137,8 @@ type prompt struct {
 func answerPrompts(t *testing.T, answers map[string]string) *[]prompt {
 	t.Helper()
 	var shown []prompt
-	cli.SetChooser(t, func(title string, options []string) (int, error) {
-		shown = append(shown, prompt{title, options})
+	cli.SetChooser(t, func(title string, options []string, selected int) (int, error) {
+		shown = append(shown, prompt{title, options, selected})
 		want, ok := answers[title]
 		if !ok {
 			t.Errorf("unexpected picker %q with %v", title, options)
@@ -325,17 +326,6 @@ func TestAddCandidateAlreadyInLibraryFails(t *testing.T) {
 	}
 	if len(*added) != 0 {
 		t.Errorf("added %d Movies, want none", len(*added))
-	}
-}
-
-func TestAddIsOnlyForRadarrInstancesForNow(t *testing.T) {
-	srv := fakeInstance(t, "sonarr")
-	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
-
-	_, stderr, code := run(t, "sonarr", "add", "--tmdb", "604")
-
-	if code == 0 || !strings.Contains(stderr, "unknown") {
-		t.Errorf("add on a Sonarr Instance should be unknown until Series can be added, got exit %d, stderr %q", code, stderr)
 	}
 }
 

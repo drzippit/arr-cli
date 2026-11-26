@@ -130,11 +130,17 @@ type addedMovieRecord struct {
 // minimumAvailability returns Radarr's spelling of value, one of
 // arrapi.MinimumAvailabilities, ignoring case.
 func minimumAvailability(value string) (string, error) {
-	i := slices.IndexFunc(arrapi.MinimumAvailabilities, func(v string) bool { return strings.EqualFold(v, value) })
+	return oneOf(arrapi.MinimumAvailabilities, "minimum availability", value)
+}
+
+// oneOf returns the option value names, ignoring case, so that it is spelled
+// as the App spells it. noun names what the options are for in the error.
+func oneOf(options []string, noun, value string) (string, error) {
+	i := slices.IndexFunc(options, func(o string) bool { return strings.EqualFold(o, value) })
 	if i < 0 {
-		return "", fmt.Errorf("minimum availability %q is not one of %s", value, strings.Join(arrapi.MinimumAvailabilities, ", "))
+		return "", fmt.Errorf("%s %q is not one of %s", noun, value, strings.Join(options, ", "))
 	}
-	return arrapi.MinimumAvailabilities[i], nil
+	return options[i], nil
 }
 
 // adder holds what adding a Title to one Instance needs. choose is nil when
@@ -183,20 +189,28 @@ func (a *adder) pickMovie(ctx context.Context, query string, tmdbID int) (arrapi
 func (a *adder) pickCandidate(recs []candidateRecord, query, noun, idFlag string) (int, error) {
 	switch {
 	case len(recs) == 0:
-		return 0, fmt.Errorf("no %ss found for %q", noun, query)
+		return 0, fmt.Errorf("no %s found for %q", plural(noun), query)
 	case a.choose == nil && len(recs) == 1:
 		return 0, nil
 	case a.choose == nil:
 		if err := renderCandidates(a.stderr, a.inst.App, recs); err != nil {
 			return 0, err
 		}
-		return 0, fmt.Errorf("%d %ss match %q; add one with %s <id>", len(recs), noun, query, idFlag)
+		return 0, fmt.Errorf("%d %s match %q; add one with %s <id>", len(recs), plural(noun), query, idFlag)
 	}
 	labels := make([]string, len(recs))
 	for i, r := range recs {
 		labels[i] = candidateLabel(r)
 	}
-	return a.choose(fmt.Sprintf("Which %s?", noun), labels)
+	return a.choose(fmt.Sprintf("Which %s?", noun), labels, 0)
+}
+
+// plural gives the plural of a Title noun: Movies, but Series.
+func plural(noun string) string {
+	if strings.HasSuffix(noun, "s") {
+		return noun
+	}
+	return noun + "s"
 }
 
 // candidateLabel names a Candidate in a picker, as
@@ -274,11 +288,17 @@ func (a *adder) resolve(s setting) (int, error) {
 		return i, nil
 	}
 	if len(s.options) == 0 {
-		return 0, fmt.Errorf("%s has no %ss; add one in the App first", a.inst.Name, s.noun)
+		return 0, fmt.Errorf("%s has no %s; add one in the App first", a.inst.Name, plural(s.noun))
 	}
 	if a.choose == nil {
-		return 0, fmt.Errorf("no %s given: pass --%s or set %s for Instance %q in %s (available: %s)",
-			s.noun, s.flag, s.configKey, a.inst.Name, config.Path(), available)
+		return 0, a.notGiven(s)
 	}
-	return a.choose(fmt.Sprintf("Which %s?", s.noun), s.options)
+	return a.choose(fmt.Sprintf("Which %s?", s.noun), s.options, 0)
+}
+
+// notGiven is the error for a setting that neither its flag nor the config
+// gave, with no terminal to ask at.
+func (a *adder) notGiven(s setting) error {
+	return fmt.Errorf("no %s given: pass --%s or set %s for Instance %q in %s (available: %s)",
+		s.noun, s.flag, s.configKey, a.inst.Name, config.Path(), strings.Join(s.options, ", "))
 }

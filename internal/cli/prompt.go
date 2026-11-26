@@ -7,9 +7,9 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-// chooser asks the person at the terminal to pick one of options and returns
-// its index.
-type chooser func(title string, options []string) (int, error)
+// chooser asks the person at the terminal to pick one of options, with the
+// one at index selected picked to start with, and returns its index.
+type chooser func(title string, options []string, selected int) (int, error)
 
 // newChooser returns a chooser that asks through in and out, or nil when
 // either is not a terminal, as when arr runs from a script or its output
@@ -18,20 +18,20 @@ var newChooser = func(in io.Reader, out io.Writer) chooser {
 	if !isTerminal(in) || !isTerminal(out) {
 		return nil
 	}
-	return func(title string, options []string) (int, error) {
-		return huhChoose(in, out, title, options)
+	return func(title string, options []string, selected int) (int, error) {
+		return huhChoose(in, out, title, options, selected)
 	}
 }
 
 // errCancelled means the person at the terminal backed out of a prompt.
 var errCancelled = errors.New("cancelled")
 
-func huhChoose(in io.Reader, out io.Writer, title string, options []string) (int, error) {
+func huhChoose(in io.Reader, out io.Writer, title string, options []string, selected int) (int, error) {
 	opts := make([]huh.Option[int], len(options))
 	for i, o := range options {
 		opts[i] = huh.NewOption(o, i)
 	}
-	var picked int
+	picked := selected
 	sel := huh.NewSelect[int]().Title(title).Options(opts...).Value(&picked)
 	err := huh.NewForm(huh.NewGroup(sel)).WithInput(in).WithOutput(out).Run()
 	if errors.Is(err, huh.ErrUserAborted) {
