@@ -75,7 +75,7 @@ func newCalendarCmd(instances func() ([]config.Instance, error), flags *globalFl
 			}
 			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetch))
 			sortCalendar(recs)
-			if err := renderCalendar(cmd.OutOrStdout(), first, recs, flags.json); err != nil {
+			if err := renderCalendar(cmd.OutOrStdout(), first, recs, flags.json, list); err != nil {
 				return err
 			}
 			return reportFailures(cmd.ErrOrStderr(), failures)
@@ -83,9 +83,7 @@ func newCalendarCmd(instances func() ([]config.Instance, error), flags *globalFl
 	}
 	cmd.Flags().BoolVar(&unmonitored, "unmonitored", false, "include unmonitored episodes and Movies")
 	cmd.Flags().StringVar(&month, "month", "", "month to show: YYYY-MM, next or prev (default: this month)")
-	// The list is the only view until the month grid lands; then the grid
-	// becomes the default and --list chooses this view.
-	cmd.Flags().BoolVar(&list, "list", false, "show a list grouped by date")
+	cmd.Flags().BoolVar(&list, "list", false, "show a list grouped by date instead of a month grid")
 	return cmd
 }
 
@@ -110,6 +108,8 @@ func parseMonth(arg string, today time.Time) (time.Time, error) {
 
 // calendarMonth is one local calendar month.
 type calendarMonth struct{ first, next time.Time }
+
+func (m calendarMonth) String() string { return m.first.Format("January 2006") }
 
 func (m calendarMonth) contains(t time.Time) bool { return !t.Before(m.first) && t.Before(m.next) }
 
@@ -223,15 +223,27 @@ func sortCalendar(recs []calendarRecord) {
 	})
 }
 
-func renderCalendar(w io.Writer, first time.Time, recs []calendarRecord, asJSON bool) error {
+// renderCalendar writes recs for the month starting at first: as JSON, as a
+// month grid when w is a terminal wide enough for one and list is false, or
+// else as a list grouped by date.
+func renderCalendar(w io.Writer, first time.Time, recs []calendarRecord, asJSON, list bool) error {
 	if asJSON {
 		return renderJSON(w, recs)
 	}
-	r := lipgloss.NewRenderer(w)
+	t, isTerminal := detectTerminal(w)
+	r := newRenderer(w, t, isTerminal)
+	if isTerminal && !list && gridFits(t.width) {
+		return renderGrid(w, r, t.width, calendarMonth{first, first.AddDate(0, 1, 0)}, now(), recs)
+	}
+	return renderList(w, r, first, recs)
+}
+
+// renderList writes recs under a heading for each date.
+func renderList(w io.Writer, r *lipgloss.Renderer, first time.Time, recs []calendarRecord) error {
 	bold := r.NewStyle().Bold(true)
 	dim := r.NewStyle().Faint(true)
 
-	monthName := first.Format("January 2006")
+	monthName := calendarMonth{first: first}.String()
 	if len(recs) == 0 {
 		_, err := fmt.Fprintf(w, "Nothing due in %s.\n", monthName)
 		return err
