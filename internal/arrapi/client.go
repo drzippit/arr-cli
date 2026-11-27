@@ -306,6 +306,10 @@ type Movie struct {
 	HasFile    bool   `json:"hasFile"`
 	SizeOnDisk int64  `json:"sizeOnDisk"`
 	TmdbID     int    `json:"tmdbId"`
+	// IsAvailable says whether Radarr counts the Movie as out, by its
+	// minimum availability.
+	IsAvailable      bool `json:"isAvailable"`
+	QualityProfileID int  `json:"qualityProfileId"`
 }
 
 // Movies fetches every Movie in a Radarr Instance's Library.
@@ -329,6 +333,8 @@ type Series struct {
 	TvdbID     int              `json:"tvdbId"`
 	Seasons    []Season         `json:"seasons"`
 	Statistics SeriesStatistics `json:"statistics"`
+
+	QualityProfileID int `json:"qualityProfileId"`
 }
 
 // Season is one season of a Series. Season 0 holds the specials.

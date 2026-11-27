@@ -462,3 +462,75 @@ func TestIntegrationQueueAcrossMediaAppsAndSabnzbdShowsAHandAddedDownloadOnce(t 
 		t.Errorf("want SABnzbd's own row, by its release and with no Title: %v", r)
 	}
 }
+
+// listed reports whether arr list with args, which must include --json,
+// shows the Title whose key (tvdbId or tmdbId) is id.
+func listed(t *testing.T, key string, id int, args ...string) bool {
+	t.Helper()
+	return slices.ContainsFunc(records(t, args...), func(r map[string]any) bool { return r[key] == float64(id) })
+}
+
+// eventually retries ok for up to 60s, for what an App does in the
+// background after a change.
+func eventually(ok func() bool) bool {
+	deadline := time.Now().Add(60 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Second)
+	}
+	return true
+}
+
+func TestIntegrationListFiltersOfRadarr(t *testing.T) {
+	radarr := realInstanceFor(t, "radarr")
+	useConfig(t, radarr)
+	ensureRootFolder(t, radarr, "/movies")
+	// Heat (1995): out long ago, so available, and with no file it is Missing.
+	if out, stderr, code := run(t, "radarr", "add", "--tmdb", "949", "--quality", "HD-1080p", "--root", "/movies", "--no-search"); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	heat := func(args ...string) bool {
+		return listed(t, "tmdbId", 949, append([]string{"radarr", "list", "--json"}, args...)...)
+	}
+
+	for _, f := range [][]string{{"--monitored"}, {"--quality", "hd-1080p"}, {"--status", "released"}, {"--missing"}} {
+		if !heat(f...) {
+			t.Errorf("list %v should show Heat", f)
+		}
+	}
+	for _, f := range [][]string{{"--unmonitored"}, {"--quality", "Any"}, {"--status", "announced"}} {
+		if heat(f...) {
+			t.Errorf("list %v should not show Heat", f)
+		}
+	}
+}
+
+func TestIntegrationListFiltersOfSonarr(t *testing.T) {
+	sonarr := realInstanceFor(t, "sonarr")
+	useConfig(t, sonarr)
+	ensureRootFolder(t, sonarr, "/tv")
+	// The Wire: ended, and with every episode monitored and none on disk, Missing.
+	if out, stderr, code := run(t, "sonarr", "add", "--tvdb", "79126", "--quality", "HD-1080p", "--root", "/tv", "--monitor", "all", "--no-search"); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	wire := func(args ...string) bool {
+		return listed(t, "tvdbId", 79126, append([]string{"sonarr", "list", "--json"}, args...)...)
+	}
+
+	// Sonarr fetches the episodes in the background after adding.
+	if !eventually(func() bool { return wire("--missing") }) {
+		t.Errorf("list --missing should show The Wire once Sonarr has its episodes")
+	}
+	for _, f := range [][]string{{"--monitored"}, {"--quality", "HD-1080p"}, {"--status", "ended"}} {
+		if !wire(f...) {
+			t.Errorf("list %v should show The Wire", f)
+		}
+	}
+	for _, f := range [][]string{{"--unmonitored"}, {"--quality", "Any"}, {"--status", "continuing"}} {
+		if wire(f...) {
+			t.Errorf("list %v should not show The Wire", f)
+		}
+	}
+}

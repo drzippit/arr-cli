@@ -105,7 +105,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "tvdbId": 371980,
     "seasons": 2,
     "episodes": 19,
-    "episodeFiles": 19
+    "episodeFiles": 19,
+    "qualityProfile": "HD-1080p"
   },
   {
     "instance": "sonarr",
@@ -118,7 +119,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "tvdbId": 392573,
     "seasons": 1,
     "episodes": 10,
-    "episodeFiles": 9
+    "episodeFiles": 9,
+    "qualityProfile": "WEB-2160p"
   },
   {
     "instance": "sonarr",
@@ -131,7 +133,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "tvdbId": 70533,
     "seasons": 3,
     "episodes": 0,
-    "episodeFiles": 0
+    "episodeFiles": 0,
+    "qualityProfile": "HD-1080p"
   }
 ]
 `
@@ -145,7 +148,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "monitored": true,
     "sizeOnDisk": 0,
     "tmdbId": 489,
-    "hasFile": false
+    "hasFile": false,
+    "qualityProfile": "Ultra-HD"
   },
   {
     "instance": "radarr-4k",
@@ -156,7 +160,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "monitored": true,
     "sizeOnDisk": 8589934592,
     "tmdbId": 603,
-    "hasFile": true
+    "hasFile": true,
+    "qualityProfile": "HD-1080p"
   },
   {
     "instance": "radarr-4k",
@@ -167,7 +172,8 @@ func TestListJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "monitored": false,
     "sizeOnDisk": 0,
     "tmdbId": 687163,
-    "hasFile": false
+    "hasFile": false,
+    "qualityProfile": "Any"
   }
 ]
 `
