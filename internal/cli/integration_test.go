@@ -397,3 +397,23 @@ func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
 		t.Errorf("want the paused Download with its position and size, got %v", found)
 	}
 }
+
+func TestIntegrationQueueAcrossMediaAppsAndSabnzbdShowsAHandAddedDownloadOnce(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, realInstanceFor(t, "sonarr"), realInstanceFor(t, "radarr"), sab)
+	id := addNZB(t, sab, "Arr.Cli.Joined.Queue.Test", -2)
+
+	var found []map[string]any
+	for _, r := range records(t, "queue", "--json") {
+		if r["downloadId"] == id {
+			found = append(found, r)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("want Download %s once, got %d rows", id, len(found))
+	}
+	r := found[0]
+	if r["instance"] != "sabnzbd" || r["release"] != "Arr.Cli.Joined.Queue.Test" || r["title"] != nil {
+		t.Errorf("want SABnzbd's own row, by its release and with no Title: %v", r)
+	}
+}

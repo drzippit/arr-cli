@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -21,7 +22,10 @@ import (
 // goes by its Release. Season, Episode and EpisodeTitle are set for Sonarr,
 // Year for Radarr. Priority, Category and
 // Position (from 1, in queue order) are set for Download Clients; a Download
-// being post-processed has no Position.
+// being post-processed has no Position. DownloadClientInstance names the
+// Download Client Instance the live values come from: the Instance itself on
+// a Download Client's row, and the one joined to a Media App's row by
+// DownloadID (ADR 0005).
 type queueRecord struct {
 	Instance            string     `json:"instance"`
 	App                 config.App `json:"app"`
@@ -43,12 +47,20 @@ type queueRecord struct {
 	Priority            string     `json:"priority,omitempty"`
 	Category            string     `json:"category,omitempty"`
 	Position            *int       `json:"position,omitempty"`
+
+	DownloadClientInstance string `json:"downloadClientInstance,omitempty"`
+
+	// importState is the Media App's import state (such as importBlocked),
+	// when Status is one.
+	importState string
 }
 
 // newQueueCmd builds a queue command for the Instances that instances returns:
-// one for `arr <instance> queue`, or all of them for `arr queue`. It only
-// displays the queue; it has no remove, blocklist or retry actions.
-func newQueueCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
+// one for `arr <instance> queue`, or all of them for `arr queue`, which joins
+// the Downloads a Media App and a Download Client both list into one row
+// (ADR 0005). It only displays the queue; it has no remove, blocklist or
+// retry actions.
+func newQueueCmd(instances func() ([]config.Instance, error), join bool, flags *globalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "queue",
 		Short: "Show downloads in progress on each Instance",
@@ -59,6 +71,9 @@ func newQueueCmd(instances func() ([]config.Instance, error), flags *globalFlags
 				return err
 			}
 			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchQueue))
+			if join {
+				recs = joinDownloads(recs)
+			}
 			if err := renderQueue(cmd.OutOrStdout(), recs, flags.json); err != nil {
 				return err
 			}
@@ -101,6 +116,9 @@ func newQueueRecord(inst config.Instance, it arrapi.QueueItem) queueRecord {
 		Protocol:            it.Protocol,
 		DownloadID:          it.DownloadID,
 	}
+	if r.Status != it.Status {
+		r.importState = r.Status
+	}
 	if it.Size > 0 {
 		r.Progress = math.Round((it.Size-it.SizeLeft)/it.Size*1000) / 10
 	}
@@ -135,7 +153,10 @@ func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi
 	if err != nil {
 		return instanceResult[queueRecord]{err: err}
 	}
-	base := queueRecord{Instance: inst.Name, App: inst.App, DownloadClient: inst.App.DisplayName(), Protocol: "usenet"}
+	base := queueRecord{
+		Instance: inst.Name, App: inst.App, DownloadClient: inst.App.DisplayName(), Protocol: "usenet",
+		DownloadClientInstance: inst.Name,
+	}
 	// download is a row for the Download with this name and ID.
 	download := func(name, id string) queueRecord {
 		r := base
@@ -164,6 +185,50 @@ func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi
 		recs = append(recs, r)
 	}
 	return instanceResult[queueRecord]{recs: recs}
+}
+
+// joinDownloads makes one row of each Download that a Media App and a
+// Download Client both list, matched on the Download Client's ID. The row
+// keeps the Media App's place and what the Download is for, and takes how it
+// is going from the Download Client, except that the Media App's import
+// state wins as the status, since that is what needs acting on. Every other
+// row stays as it is, in order.
+func joinDownloads(recs []queueRecord) []queueRecord {
+	byID := map[string]int{}
+	for i, r := range recs {
+		if r.App.Kind() == config.DownloadClient && r.DownloadID != "" {
+			byID[strings.ToLower(r.DownloadID)] = i
+		}
+	}
+	joined := map[int]bool{}
+	for i, r := range recs {
+		if r.App.Kind() != config.MediaApp || r.DownloadID == "" {
+			continue
+		}
+		j, ok := byID[strings.ToLower(r.DownloadID)]
+		if !ok {
+			continue
+		}
+		recs[i] = r.joinedWith(recs[j])
+		joined[j] = true
+	}
+	out := make([]queueRecord, 0, len(recs)-len(joined))
+	for i, r := range recs {
+		if !joined[i] {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// joinedWith is the Media App's row r with the live values from d, the same
+// Download's row in a Download Client.
+func (r queueRecord) joinedWith(d queueRecord) queueRecord {
+	r.DownloadClientInstance = d.Instance
+	r.Progress, r.Size, r.SizeLeft, r.TimeLeft = d.Progress, d.Size, d.SizeLeft, d.TimeLeft
+	r.Priority, r.Category, r.Position = d.Priority, d.Category, d.Position
+	r.Status = cmp.Or(r.importState, d.Status)
+	return r
 }
 
 // sabnzbdTimeLeft turns SABnzbd's h:mm:ss, or d:hh:mm:ss from a day on, into
@@ -231,10 +296,8 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 }
 
 // hasDownloadClientValues reports whether r has values only a Download Client
-// gives.
-func (r queueRecord) hasDownloadClientValues() bool {
-	return r.Priority != "" || r.Category != "" || r.Position != nil
-}
+// gives: it is a Download Client's row, or joined to one.
+func (r queueRecord) hasDownloadClientValues() bool { return r.DownloadClientInstance != "" }
 
 // displayTitle is the Title the Download is for, or its Release when no Media
 // App said, as for one added to a Download Client by hand.

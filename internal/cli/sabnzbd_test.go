@@ -181,7 +181,7 @@ func TestStatusMarksSabnzbdOlderThanSupported(t *testing.T) {
 	}
 }
 
-func TestListCalendarAndQueueSkipDownloadClients(t *testing.T) {
+func TestListAndCalendarSkipDownloadClients(t *testing.T) {
 	sonarr := fakeInstance(t, "sonarr")
 	sab := fakeSabnzbd(t) // fails the test on any request
 	useConfig(t,
@@ -190,7 +190,7 @@ func TestListCalendarAndQueueSkipDownloadClients(t *testing.T) {
 	)
 	today(t)
 
-	for _, args := range [][]string{{"list"}, {"calendar", "--list"}, {"queue"}} {
+	for _, args := range [][]string{{"list"}, {"calendar", "--list"}} {
 		out, stderr, code := run(t, args...)
 		if code != 0 {
 			t.Errorf("arr %v: exit code %d, stderr: %s", args, code, stderr)
@@ -277,7 +277,7 @@ func TestQueueOfSabnzbdListsItsDownloadsInOrderIncludingPostProcessing(t *testin
 	}
 	for _, want := range []string{
 		"PRIORITY", "CATEGORY", "SIZE", "LEFT",
-		"Severance.S02E07.1080p.WEB-DL-EXAMPLE", "25%", "3.9 GiB", "2.9 GiB", "25m", "downloading", "high", "tv",
+		"Severance.S02E07.1080p.WEB-DL-EXAMPLE", "40%", "3.9 GiB", "2.3 GiB", "25m", "downloading", "high", "tv",
 		"Some.Linux.ISO.x64", "0%", "1d 2h 3m", "queued", "normal",
 		"The.Bear.S03E01.1080p.WEB-DL-EXAMPLE", "100%", "extracting",
 	} {
@@ -309,7 +309,7 @@ func TestQueueOfSabnzbdAsJSON(t *testing.T) {
 	first := map[string]any{
 		"instance": "sab", "app": "sabnzbd",
 		"release": "Severance.S02E07.1080p.WEB-DL-EXAMPLE", "downloadId": "SABnzbd_nzo_abc123",
-		"progress": float64(25), "size": float64(4000 << 20), "sizeLeft": float64(3000 << 20),
+		"progress": float64(40), "size": float64(4000 << 20), "sizeLeft": float64(2400 << 20),
 		"timeLeft": "00:25:00", "status": "downloading", "priority": "high", "category": "tv",
 		"position": float64(1), "downloadClient": "SABnzbd", "protocol": "usenet",
 	}

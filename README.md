@@ -137,7 +137,7 @@ arr radarr-4k status    # just radarr-4k
 | Command | What it does |
 | --- | --- |
 | `arr [<instance>] status` | Whether each Instance is reachable, its version, and how many Warnings it reports. For SABnzbd also whether it is downloading or paused, its speed, and the free space in its download folders. `-v` lists each Warning. |
-| `arr [<instance>] queue` | Downloads in progress, with progress and time left. `arr queue` covers Sonarr and Radarr; `arr <sabnzbd> queue` shows SABnzbd's own Queue in order, with priority and category, including Downloads it is still verifying, repairing or unpacking. |
+| `arr [<instance>] queue` | Downloads in progress, with progress and time left. `arr queue` shows each Download once: one that Sonarr or Radarr grabbed and SABnzbd is fetching shows the Title and episode, with SABnzbd's live progress, priority and category, and one you added to SABnzbd by hand shows under its own name. `arr <instance> queue` shows just what that Instance reports, and for SABnzbd that includes Downloads it is still verifying, repairing or unpacking. |
 | `arr [<instance>] calendar` | Episodes and Movie releases due this month, as a grid in a wide enough terminal. `--month 2026-12`, `--month next` or `prev` picks another month; `--list` gives a list by date; `--unmonitored` includes unmonitored ones. |
 | `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. `--plain` prints one Title per line. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
