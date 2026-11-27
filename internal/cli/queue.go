@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,8 +19,10 @@ import (
 	"github.com/drzippit/arr-cli/internal/sabapi"
 )
 
-// queueRecord is one Download in progress on one Instance. Season, Episode and
-// EpisodeTitle are set for Sonarr, Year for Radarr. Priority, Category and
+// queueRecord is one Download in progress on one Instance. Title is the Series
+// or Movie it is for, which only a Media App knows; a Download Client's own row
+// goes by its Release. Season, Episode and EpisodeTitle are set for Sonarr,
+// Year for Radarr. Priority, Category and
 // Position (from 1, in queue order) are set for Download Clients; a Download
 // being post-processed has no Position. DownloadClientInstance names the
 // Download Client Instance the live values come from: the Instance itself on
@@ -28,7 +31,7 @@ import (
 type queueRecord struct {
 	Instance            string     `json:"instance"`
 	App                 config.App `json:"app"`
-	Title               string     `json:"title"`
+	Title               string     `json:"title,omitempty"`
 	Year                int        `json:"year,omitempty"`
 	Season              *int       `json:"season,omitempty"`
 	Episode             *int       `json:"episode,omitempty"`
@@ -198,27 +201,31 @@ func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi
 		Instance: inst.Name, App: inst.App, DownloadClient: inst.App.DisplayName(), Protocol: "usenet",
 		DownloadClientInstance: inst.Name,
 	}
-	var recs []queueRecord
-	for _, slot := range q.Slots {
+	// download is a row for the Download with this name and ID.
+	download := func(name, id string) queueRecord {
 		r := base
-		r.Title, r.Release, r.DownloadID = slot.Filename, slot.Filename, slot.NzoID
-		r.Progress = float64(slot.Percentage)
-		r.Size, r.SizeLeft = slot.Bytes(), slot.BytesLeft()
-		r.TimeLeft = sabnzbdTimeLeft(slot.TimeLeft)
-		r.Status = strings.ToLower(slot.Status)
-		r.Priority, r.Category = strings.ToLower(slot.Priority), slot.Category
-		position := slot.Index + 1
+		r.Release, r.DownloadID = name, id
+		return r
+	}
+	var recs []queueRecord
+	for _, d := range q.Slots {
+		r := download(d.Filename, d.NzoID)
+		r.Progress = float64(d.Percentage)
+		r.Size, r.SizeLeft = d.Bytes(), d.BytesLeft()
+		r.TimeLeft = sabnzbdTimeLeft(d.TimeLeft)
+		r.Status = strings.ToLower(d.Status)
+		r.Priority, r.Category = strings.ToLower(d.Priority), d.Category
+		position := d.Index + 1
 		r.Position = &position
 		recs = append(recs, r)
 	}
-	for _, h := range history {
-		if h.Finished() {
+	for _, d := range history {
+		if d.Finished() {
 			continue
 		}
-		r := base
-		r.Title, r.Release, r.DownloadID = h.Name, h.Name, h.NzoID
-		r.Progress, r.Size = 100, h.Bytes
-		r.Status, r.Category = strings.ToLower(h.Status), h.Category
+		r := download(d.Name, d.NzoID)
+		r.Progress, r.Size = 100, d.Bytes
+		r.Status, r.Category = strings.ToLower(d.Status), d.Category
 		recs = append(recs, r)
 	}
 	summary := &clientSummary{
@@ -315,17 +322,45 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 	if asJSON {
 		return renderJSON(w, recs)
 	}
+	// A Download Client's size, priority and category get columns only when
+	// some row has them, so a Media App's queue looks as it always has.
+	withClient := slices.ContainsFunc(recs, queueRecord.hasDownloadClientValues)
+	header := []string{"INSTANCE", "TITLE", "EPISODE", "PROGRESS"}
+	if withClient {
+		header = append(header, "SIZE", "LEFT")
+	}
+	header = append(header, "ETA", "STATUS")
+	if withClient {
+		header = append(header, "PRIORITY", "CATEGORY")
+	}
+	header = append(header, "CLIENT")
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
-		rows = append(rows, []string{
-			r.Instance, r.displayTitle(), r.displayEpisode(), fmt.Sprintf("%.0f%%", math.Floor(r.Progress)),
-			formatTimeLeft(r.TimeLeft), orDash(r.Status), orDash(r.Priority), orDash(r.Category), orDash(r.DownloadClient),
-		})
+		row := []string{r.Instance, r.displayTitle(), r.displayEpisode(), fmt.Sprintf("%.0f%%", math.Floor(r.Progress))}
+		if withClient {
+			row = append(row, formatSize(r.Size), formatSize(r.SizeLeft))
+		}
+		row = append(row, formatTimeLeft(r.TimeLeft), orDash(r.Status))
+		if withClient {
+			row = append(row, orDash(r.Priority), orDash(r.Category))
+		}
+		rows = append(rows, append(row, orDash(r.DownloadClient)))
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "EPISODE", "PROGRESS", "ETA", "STATUS", "PRIORITY", "CATEGORY", "CLIENT"}, rows)
+	return renderTable(w, header, rows)
 }
 
-func (r queueRecord) displayTitle() string { return titleWithYear(r.Title, r.Year) }
+// hasDownloadClientValues reports whether r has values only a Download Client
+// gives: it is a Download Client's row, or joined to one.
+func (r queueRecord) hasDownloadClientValues() bool { return r.DownloadClientInstance != "" }
+
+// displayTitle is the Title the Download is for, or its Release when no Media
+// App said, as for one added to a Download Client by hand.
+func (r queueRecord) displayTitle() string {
+	if r.Title == "" {
+		return r.Release
+	}
+	return titleWithYear(r.Title, r.Year)
+}
 
 // titleWithYear writes a Title as "Good Will Hunting (1997)", or just its name
 // when the year is unknown or the name already ends with it, as in Sonarr's
