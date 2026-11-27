@@ -193,7 +193,7 @@ For a Selection no filter can express, pass `-` in place of the query and give t
 arr sonarr list --json --monitored | jq '[.[] | select(.seasons > 5)]' | arr sonarr edit - --set-quality HD-1080p --yes
 ```
 
-`hunt` makes its Selection the same way and asks the App to search for each Title: one search per Series in Sonarr, one for all the Movies in Radarr. Each search counts against your indexers' API limits, so a Hunt over more than 25 Titles is refused unless you pass `--max <n>` or `--all`. Its HUNT column (`hunt` in `--json`) says whether the App took each search. If some failed, `hunt` still tries the rest, names the failures on stderr, and exits 1.
+`hunt` makes its Selection the same way and asks the App to Hunt each Title, as its own search button does: one command per Series in Sonarr, one for all the Movies in Radarr. Each Title's Hunt counts against your indexers' API limits, so a Hunt over more than 25 Titles is refused unless you pass `--max <n>` or `--all`; `--dry-run` previews it anyway. Its HUNT column (`hunt` in `--json`) says whether the App took each one. If some failed, `hunt` still tries the rest, names the failures on stderr, and exits 1.
 
 ### In scripts
 

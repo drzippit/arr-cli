@@ -82,10 +82,16 @@ func (f titleFilter) matches(r libraryRecord) bool {
 }
 
 // checkQuality says why --quality names no quality profile of the Libraries
-// in libs that could be fetched, listing the ones they have.
+// in libs that could be fetched, listing the ones they have. A Library whose
+// profiles could not be fetched counts as failed, since --quality needs them.
 func (f titleFilter) checkQuality(libs []library) error {
 	if f.quality == "" {
 		return nil
+	}
+	for i := range libs {
+		if libs[i].err == nil && libs[i].profilesErr != nil {
+			libs[i].err = libs[i].profilesErr
+		}
 	}
 	var known []string
 	fetched := false
@@ -155,7 +161,7 @@ func makeSelection(cmd *cobra.Command, inst config.Instance, args []string, filt
 	if err := requireSupportedVersion(ctx, inst, client); err != nil {
 		return selection{}, err
 	}
-	lib := fetchLibrary(ctx, inst)
+	lib := fetchLibraryWith(ctx, inst, client)
 	if lib.err != nil {
 		return selection{}, lib.err
 	}
@@ -191,10 +197,14 @@ func readTitleIDs(r io.Reader, inst config.Instance) ([]int, error) {
 		}
 		ids := make([]int, len(recs))
 		for i, rec := range recs {
-			if rec.Instance != inst.Name {
+			// A record without its Instance, as from jq 'map({tvdbId})', is
+			// taken to be from inst.
+			if rec.Instance != "" && rec.Instance != inst.Name {
 				return nil, fmt.Errorf("stdin has a record from Instance %q, not %s; its IDs mean nothing here", rec.Instance, inst.Name)
 			}
-			ids[i] = cmp.Or(rec.TvdbID, rec.TmdbID)
+			if ids[i] = cmp.Or(rec.TvdbID, rec.TmdbID); ids[i] == 0 {
+				return nil, fmt.Errorf("stdin record %d has no tvdbId or tmdbId", i+1)
+			}
 		}
 		return ids, nil
 	}
@@ -215,10 +225,16 @@ func readTitleIDs(r io.Reader, inst config.Instance) ([]int, error) {
 }
 
 // titlesWithIDs gives the Titles of inst's Library with these TVDB (Sonarr)
-// or TMDB (Radarr) IDs, refusing an ID that is not in it.
+// or TMDB (Radarr) IDs, once each however often an ID is given, refusing an ID
+// that is not in it.
 func titlesWithIDs(inst config.Instance, titles []libraryRecord, ids []int) ([]libraryRecord, error) {
 	var out []libraryRecord
+	seen := map[int]bool{}
 	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
 		i := slices.IndexFunc(titles, func(r libraryRecord) bool { return r.TvdbID == id || r.TmdbID == id })
 		if i < 0 {
 			return nil, fmt.Errorf("no Title with ID %d in %s's Library", id, inst.Name)
@@ -226,4 +242,158 @@ func titlesWithIDs(inst config.Instance, titles []libraryRecord, ids []int) ([]l
 		out = append(out, titles[i])
 	}
 	return out, nil
+}
+
+// selectionGuard holds the flags that guard a Selection (ADR 0006).
+type selectionGuard struct {
+	yes, dryRun, all bool
+}
+
+func (g *selectionGuard) addFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&g.yes, "yes", false, "change the Selection without asking")
+	cmd.Flags().BoolVar(&g.dryRun, "dry-run", false, "show what would change, and change nothing")
+	cmd.Flags().BoolVar(&g.all, "all", false, "make the whole Library the Selection when there is no query or filter")
+}
+
+// newMediaAppClient returns a client for inst, a Media App Instance.
+func newMediaAppClient(inst config.Instance) (*arrapi.Client, error) {
+	key, err := inst.ResolveAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	return arrapi.New(inst.URL, key), nil
+}
+
+// checkSelection refuses to make the whole Library the Selection by
+// accident: with no query and no filter, --all must say so (ADR 0006).
+func (g selectionGuard) checkSelection(query string, f titleFilter) error {
+	if query == "" && !f.any() && !g.all {
+		return errors.New("no query or filter, so this would act on the whole Library; pass --all if that is what you mean")
+	}
+	return nil
+}
+
+// confirm asks question in a terminal, unless --yes was given. Without a
+// terminal it refuses, since a script must say --yes (ADR 0006); refusal
+// says what the command would do, as in "this would change 2 Movies".
+func (g selectionGuard) confirm(cmd *cobra.Command, question, refusal string) error {
+	if g.yes {
+		return nil
+	}
+	ask := newConfirmer(cmd.InOrStdin(), cmd.OutOrStdout())
+	if ask == nil {
+		return fmt.Errorf("%s; from a script pass --yes, or --dry-run to see it first", refusal)
+	}
+	ok, err := ask(question)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errCancelled
+	}
+	return nil
+}
+
+// pick lets the person at the terminal untick Titles of sel before anything
+// happens. With --yes or --dry-run, or without a terminal, sel stays whole.
+func (g selectionGuard) pick(cmd *cobra.Command, sel []libraryRecord, title string) ([]libraryRecord, error) {
+	if g.yes || g.dryRun {
+		return sel, nil
+	}
+	choose := newPicker(cmd.InOrStdin(), cmd.OutOrStdout())
+	if choose == nil {
+		return sel, nil
+	}
+	options := make([]string, len(sel))
+	for i, r := range sel {
+		options[i] = r.displayTitle()
+	}
+	picked, err := choose(title, options)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]libraryRecord, 0, len(picked))
+	for _, i := range picked {
+		out = append(out, sel[i])
+	}
+	return out, nil
+}
+
+// selectTitles is the Selection: the Titles matching query and filter.
+func selectTitles(titles []libraryRecord, query string, filter titleFilter) []libraryRecord {
+	sel := titlesMatching(slices.Clone(titles), query)
+	return slices.DeleteFunc(sel, func(r libraryRecord) bool { return !filter.matches(r) })
+}
+
+// bulkAction is what a bulk command does to a Selection, for settle.
+type bulkAction struct {
+	// verb and done say what it does, as in "this would hunt 2 Series" and
+	// "nothing hunted".
+	verb, done string
+	// pickTitle heads the picker.
+	pickTitle string
+	// question is the yes/no question about acting on n Titles.
+	question func(n int) string
+	// check, when set, says why the matched Titles cannot be acted on, as
+	// hunt's cap does. A dry run skips it.
+	check func(titles []libraryRecord) error
+	// render prints Titles as the command shows them before acting.
+	render func(titles []libraryRecord) error
+}
+
+// settle takes a Selection's titles through the guards every bulk command
+// has (ADR 0006) and returns the Titles to act on. An empty Selection, a dry
+// run, or picking nothing is reported here and gives no Titles and no error.
+func (g selectionGuard) settle(cmd *cobra.Command, inst config.Instance, titles []libraryRecord, a bulkAction) ([]libraryRecord, error) {
+	stderr := cmd.ErrOrStderr()
+	if len(titles) == 0 {
+		fmt.Fprintln(stderr, "arr: no Titles matched; nothing "+a.done)
+		return nil, a.render(nil)
+	}
+	if g.dryRun {
+		if err := a.render(titles); err != nil {
+			return nil, err
+		}
+		fmt.Fprintln(stderr, "arr: dry run; nothing "+a.done)
+		return nil, nil
+	}
+	if a.check != nil {
+		if err := a.check(titles); err != nil {
+			return nil, err
+		}
+	}
+	titles, err := g.pick(cmd, titles, a.pickTitle)
+	if err != nil {
+		return nil, err
+	}
+	if len(titles) == 0 {
+		fmt.Fprintln(stderr, "arr: nothing picked; nothing "+a.done)
+		return nil, a.render(nil)
+	}
+	refusal := fmt.Sprintf("this would %s %s", a.verb, countTitles(inst.App, len(titles)))
+	if err := g.confirm(cmd, a.question(len(titles)), refusal); err != nil {
+		return nil, err
+	}
+	return titles, nil
+}
+
+// titleIDs gives the IDs of titles in their Instance's Library.
+func titleIDs(titles []libraryRecord) []int {
+	ids := make([]int, len(titles))
+	for i, r := range titles {
+		ids[i] = r.id
+	}
+	return ids
+}
+
+// countTitles says how many Titles of app's kind n is, as in "2 Movies".
+func countTitles(app config.App, n int) string {
+	noun := "Series"
+	if app == config.Radarr {
+		noun = "Movies"
+		if n == 1 {
+			noun = "Movie"
+		}
+	}
+	return fmt.Sprintf("%d %s", n, noun)
 }

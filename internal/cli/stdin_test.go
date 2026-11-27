@@ -104,3 +104,37 @@ func TestFiltersNarrowTheIDsFromStdin(t *testing.T) {
 		t.Errorf("want only Good Will Hunting (1) hunted, got %+v", *cmds)
 	}
 }
+
+func TestAnIDGivenTwiceOnStdinCountsOnce(t *testing.T) {
+	srv, cmds := fakeMediaAppForHunt(t, "sonarr", nil)
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	_, stderr, code := runWithStdin(t, "70533\n392573\n70533\n", "sonarr", "hunt", "-", "--yes")
+
+	if code != 0 || len(*cmds) != 2 {
+		t.Errorf("exit code %d, stderr %q, want 2 searches, got %+v", code, stderr, *cmds)
+	}
+}
+
+func TestStdinJSONRecordsMayLeaveOutTheirInstance(t *testing.T) {
+	srv, edits := fakeMediaAppForEdit(t, "radarr", nil)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	// As from jq 'map({tmdbId})'.
+	_, stderr, code := runWithStdin(t, `[{"tmdbId": 603}]`, "radarr", "edit", "-", "--set-quality", "Any", "--yes")
+
+	if code != 0 || len(*edits) != 1 || !sameIDs((*edits)[0].MovieIDs, 2) {
+		t.Errorf("exit code %d, stderr %q, edits %+v", code, stderr, *edits)
+	}
+}
+
+func TestStdinJSONRecordWithoutAnIDIsRefused(t *testing.T) {
+	srv, edits := fakeMediaAppForEdit(t, "radarr", nil)
+	useConfig(t, instanceDef{"radarr", "radarr", srv.URL, testAPIKey})
+
+	_, stderr, code := runWithStdin(t, `[{"tmdbId": 603}, {"title": "The Matrix"}]`, "radarr", "edit", "-", "--set-quality", "Any", "--yes")
+
+	if code != 1 || !strings.Contains(stderr, "stdin record 2 has no tvdbId or tmdbId") || len(*edits) != 0 {
+		t.Errorf("exit code %d, stderr %q, %d edits", code, stderr, len(*edits))
+	}
+}

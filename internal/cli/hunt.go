@@ -10,7 +10,7 @@ import (
 )
 
 // huntRecord is one Title of a Hunt's Selection, with how its Hunt went:
-// queued when the App took the search, failed when it did not.
+// queued when the App took it, failed when it did not.
 type huntRecord struct {
 	libraryRecord
 	Hunt      string `json:"hunt,omitempty"`
@@ -33,56 +33,36 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 		Use:   "hunt [query]",
 		Short: "Look through the indexers for Releases of many Titles at once",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := makeSelection(cmd, inst, args, filter, guard)
+			sel, err := makeSelection(cmd, inst, args, filter, guard)
 			if err != nil {
 				return err
 			}
-			ctx, client, sel := cmd.Context(), s.client, s.titles
-			w, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
-			recs := make([]huntRecord, len(sel))
-			for i, r := range sel {
-				recs[i] = huntRecord{libraryRecord: r}
-			}
-			if len(sel) == 0 {
-				fmt.Fprintln(stderr, "arr: no Titles matched; nothing hunted")
-				return renderHunts(w, recs, flags.json)
-			}
-			if len(sel) > huntCap && !guard.all {
-				return fmt.Errorf("this Hunt covers %s, more than %d; pass --max %d to hunt them all, or narrow the Selection",
-					countTitles(inst.App, len(sel)), huntCap, len(sel))
-			}
-			if guard.dryRun {
-				if err := renderHunts(w, recs, flags.json); err != nil {
-					return err
-				}
-				fmt.Fprintln(stderr, "arr: dry run; nothing hunted")
-				return nil
-			}
-			if sel, err = guard.pick(cmd, sel, "Which to hunt? All are ticked; untick any to leave out"); err != nil {
+			ctx, w := cmd.Context(), cmd.OutOrStdout()
+			titles, err := guard.settle(cmd, inst, sel.titles, bulkAction{
+				verb: "hunt", done: "hunted",
+				pickTitle: "Which to hunt? All are ticked; untick any to leave out",
+				question: func(n int) string {
+					return fmt.Sprintf("Hunt for Releases of %s in %s?", countTitles(inst.App, n), inst.Name)
+				},
+				check: func(titles []libraryRecord) error {
+					if len(titles) > huntCap && !guard.all {
+						return fmt.Errorf("this Hunt covers %s, more than %d; pass --max %d or --all to hunt them all, or narrow the Selection",
+							countTitles(inst.App, len(titles)), huntCap, len(titles))
+					}
+					return nil
+				},
+				render: func(titles []libraryRecord) error { return renderHunts(w, huntRecords(titles), flags.json) },
+			})
+			if err != nil || titles == nil {
 				return err
 			}
-			if len(sel) == 0 {
-				fmt.Fprintln(stderr, "arr: nothing picked; nothing hunted")
-				return renderHunts(w, nil, flags.json)
-			}
-			recs = make([]huntRecord, len(sel))
-			for i, r := range sel {
-				recs[i] = huntRecord{libraryRecord: r}
-			}
-			question := fmt.Sprintf("Hunt for Releases of %s in %s?", countTitles(inst.App, len(sel)), inst.Name)
-			if err := guard.confirm(cmd, question, len(sel)); err != nil {
-				return err
-			}
+			recs := huntRecords(titles)
 			if inst.App == config.Sonarr {
 				for i := range recs {
-					recs[i].hunted(client.SearchSeries(ctx, recs[i].id))
+					recs[i].hunted(sel.client.SearchSeries(ctx, recs[i].id))
 				}
 			} else {
-				ids := make([]int, len(recs))
-				for i, r := range recs {
-					ids[i] = r.id
-				}
-				err := client.SearchMovies(ctx, ids)
+				err := sel.client.SearchMovies(ctx, titleIDs(titles))
 				for i := range recs {
 					recs[i].hunted(err)
 				}
@@ -96,7 +76,7 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 					failures = append(failures, failure{inst.Name + ": " + r.Title, r.HuntError})
 				}
 			}
-			return reportFailures(stderr, failures)
+			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
 	filter.addFlags(cmd)
@@ -105,8 +85,17 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	return cmd
 }
 
+// huntRecords gives a row for each of titles, not yet hunted.
+func huntRecords(titles []libraryRecord) []huntRecord {
+	recs := make([]huntRecord, len(titles))
+	for i, r := range titles {
+		recs[i] = huntRecord{libraryRecord: r}
+	}
+	return recs
+}
+
 // hunted records how the Hunt for r went: err is why the App did not take
-// the search, or nil.
+// it, or nil.
 func (r *huntRecord) hunted(err error) {
 	if err != nil {
 		r.Hunt, r.HuntError = "failed", err.Error()
@@ -128,7 +117,7 @@ func renderHunts(w io.Writer, recs []huntRecord, asJSON bool) error {
 		if r.Hunt == "failed" {
 			hunt = "FAILED"
 		}
-		rows[i] = []string{r.Instance, r.displayTitle(), yesNo(r.Monitored), hunt}
+		rows[i] = append(r.libraryRow(), hunt)
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "MONITORED", "HUNT"}, rows)
+	return renderTable(w, append(libraryHeader(), "HUNT"), rows)
 }
