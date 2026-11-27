@@ -62,10 +62,20 @@ func checkWatch(cmd *cobra.Command, interval time.Duration, flags *globalFlags) 
 	return nil
 }
 
-// watchQueue draws the queue of insts every interval until Ctrl-C. An
-// Instance that cannot answer is shown in the frame, so the watch goes on,
-// and ending it with Ctrl-C is not a failure.
-func watchQueue(ctx context.Context, w io.Writer, insts []config.Instance, join bool, interval time.Duration) error {
+// queueWatch is what queue --watch shows: the queue of insts, joined as arr
+// queue joins it when join is set, every interval. command is the command
+// line it was started with, such as "arr sab queue", for the heading.
+type queueWatch struct {
+	command  string
+	insts    []config.Instance
+	join     bool
+	interval time.Duration
+}
+
+// watchQueue draws v until Ctrl-C. An Instance that cannot answer is shown
+// in the frame, so the watch goes on, and ending it with Ctrl-C is not a
+// failure.
+func watchQueue(ctx context.Context, w io.Writer, v queueWatch) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if _, err := io.WriteString(w, enterWatchScreen); err != nil {
@@ -74,7 +84,7 @@ func watchQueue(ctx context.Context, w io.Writer, insts []config.Instance, join 
 	defer io.WriteString(w, leaveWatchScreen)
 	for frame := 1; ; frame++ {
 		var buf bytes.Buffer
-		if err := drawQueueFrame(ctx, &buf, insts, join, interval); err != nil {
+		if err := v.drawFrame(ctx, &buf); err != nil {
 			return err
 		}
 		if _, err := w.Write(buf.Bytes()); err != nil {
@@ -83,29 +93,26 @@ func watchQueue(ctx context.Context, w io.Writer, insts []config.Instance, join 
 		if watchFrames > 0 && frame >= watchFrames {
 			return nil
 		}
-		if !watchWait(ctx, interval) {
+		if !watchWait(ctx, v.interval) {
 			return nil
 		}
 	}
 }
 
-// drawQueueFrame writes one frame: a heading, the queue, how each Download
-// Client is doing, and the Instances that could not answer.
-func drawQueueFrame(ctx context.Context, w io.Writer, insts []config.Instance, join bool, interval time.Duration) error {
-	results := forEachInstance(ctx, insts, fetchQueueAndClient)
+// drawFrame writes one frame: a heading, the queue, how each Download Client
+// is doing, and the Instances that could not answer.
+func (v queueWatch) drawFrame(ctx context.Context, w io.Writer) error {
+	results := forEachInstance(ctx, v.insts, fetchQueueAndDownloadClient)
 	queues := make([]instanceResult[queueRecord], len(results))
-	var clients []*clientSummary
+	var clients []*downloadClientSummary
 	for i, res := range results {
 		queues[i] = res.queue
-		if res.client != nil {
-			clients = append(clients, res.client)
+		if res.downloadClient != nil {
+			clients = append(clients, res.downloadClient)
 		}
 	}
-	recs, failures := gather(insts, queues)
-	if join {
-		recs = joinDownloads(recs)
-	}
-	fmt.Fprintf(w, "%sarr queue, every %s · %s · Ctrl-C to stop\n\n", clearScreen, interval, now().Format("15:04:05"))
+	recs, failures := gatherQueue(v.insts, queues, v.join)
+	fmt.Fprintf(w, "%s%s, every %s · %s · Ctrl-C to stop\n\n", clearScreen, v.command, v.interval, now().Format("15:04:05"))
 	if err := renderQueue(w, recs, false); err != nil {
 		return err
 	}

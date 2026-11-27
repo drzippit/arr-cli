@@ -32,7 +32,7 @@ func TestQueueWatchRedrawsOnTheAlternateScreenWithADownloadClientFooter(t *testi
 	if n := strings.Count(out, "INSTANCE"); n != 2 {
 		t.Errorf("want 2 frames, got %d:\n%s", n, out)
 	}
-	for _, want := range []string{"every 2s", "Ctrl-C", "Severance", "sab: downloading at 2.0 MiB/s, 53m 45s left"} {
+	for _, want := range []string{"arr queue, every 2s", "Ctrl-C", "Severance", "sab: downloading at 2.0 MiB/s, 53m 45s left"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -46,7 +46,7 @@ func TestQueueWatchShowsAnUnreachableInstanceInsteadOfStopping(t *testing.T) {
 	sonarrAndSabnzbd(t, true, false)
 
 	out, stderr, code := run(t, "sonarr", "queue", "-w")
-	if code != 0 || !strings.Contains(out, "Severance") {
+	if code != 0 || !strings.Contains(out, "Severance") || !strings.Contains(out, "arr sonarr queue, every 2s") {
 		t.Fatalf("arr sonarr queue -w: exit code %d, stderr %s\n%s", code, stderr, out)
 	}
 

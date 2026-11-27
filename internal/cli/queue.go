@@ -84,12 +84,9 @@ func newQueueCmd(instances func() ([]config.Instance, error), join bool, flags *
 				return err
 			}
 			if watch {
-				return watchQueue(cmd.Context(), cmd.OutOrStdout(), insts, join, interval)
+				return watchQueue(cmd.Context(), cmd.OutOrStdout(), queueWatch{cmd.CommandPath(), insts, join, interval})
 			}
-			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchQueue))
-			if join {
-				recs = joinDownloads(recs)
-			}
+			recs, failures := gatherQueue(insts, forEachInstance(cmd.Context(), insts, fetchQueue), join)
 			if err := renderQueue(cmd.OutOrStdout(), recs, flags.json); err != nil {
 				return err
 			}
@@ -102,34 +99,44 @@ func newQueueCmd(instances func() ([]config.Instance, error), join bool, flags *
 }
 
 func fetchQueue(ctx context.Context, inst config.Instance) instanceResult[queueRecord] {
-	return fetchQueueAndClient(ctx, inst).queue
+	return fetchQueueAndDownloadClient(ctx, inst).queue
 }
 
-// queueAndClient is one Instance's Queue and, for a Download Client, how the
-// client as a whole is doing.
-type queueAndClient struct {
-	queue  instanceResult[queueRecord]
-	client *clientSummary
+// gatherQueue is gather for queues, joining the Downloads a Media App and a
+// Download Client both list when join is set (ADR 0005).
+func gatherQueue(insts []config.Instance, results []instanceResult[queueRecord], join bool) ([]queueRecord, []failure) {
+	recs, failures := gather(insts, results)
+	if join {
+		recs = joinDownloads(recs)
+	}
+	return recs, failures
 }
 
-// clientSummary is how a Download Client as a whole is doing. TimeLeft is a
-// .NET TimeSpan, as in queueRecord.
-type clientSummary struct {
+// queueAndDownloadClient is one Instance's Queue and, for a Download Client,
+// how that Download Client as a whole is doing.
+type queueAndDownloadClient struct {
+	queue          instanceResult[queueRecord]
+	downloadClient *downloadClientSummary
+}
+
+// downloadClientSummary is how a Download Client as a whole is doing.
+// TimeLeft is a .NET TimeSpan, as in queueRecord.
+type downloadClientSummary struct {
 	instance string
 	state    string
 	speed    int64
 	timeLeft string
 }
 
-func fetchQueueAndClient(ctx context.Context, inst config.Instance) queueAndClient {
+func fetchQueueAndDownloadClient(ctx context.Context, inst config.Instance) queueAndDownloadClient {
 	key, err := inst.ResolveAPIKey()
 	if err != nil {
-		return queueAndClient{queue: instanceResult[queueRecord]{err: err}}
+		return queueAndDownloadClient{queue: instanceResult[queueRecord]{err: err}}
 	}
 	if inst.App.Kind() == config.DownloadClient {
 		return fetchSabnzbdQueue(ctx, inst, sabapi.New(inst.URL, key))
 	}
-	return queueAndClient{queue: fetchMediaAppQueue(ctx, inst, key)}
+	return queueAndDownloadClient{queue: fetchMediaAppQueue(ctx, inst, key)}
 }
 
 func fetchMediaAppQueue(ctx context.Context, inst config.Instance, key string) instanceResult[queueRecord] {
@@ -187,8 +194,10 @@ const postProcessingLookback = 100
 
 // fetchSabnzbdQueue gives SABnzbd's Queue: the slots in its queue, in order,
 // then the Downloads in its history it is still post-processing.
-func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi.Client) queueAndClient {
-	failed := func(err error) queueAndClient { return queueAndClient{queue: instanceResult[queueRecord]{err: err}} }
+func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi.Client) queueAndDownloadClient {
+	failed := func(err error) queueAndDownloadClient {
+		return queueAndDownloadClient{queue: instanceResult[queueRecord]{err: err}}
+	}
 	q, err := client.Queue(ctx)
 	if err != nil {
 		return failed(err)
@@ -228,11 +237,11 @@ func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi
 		r.Status, r.Category = strings.ToLower(d.Status), d.Category
 		recs = append(recs, r)
 	}
-	summary := &clientSummary{
+	summary := &downloadClientSummary{
 		instance: inst.Name, state: strings.ToLower(q.Status),
 		speed: q.SpeedBytes(), timeLeft: sabnzbdTimeLeft(q.TimeLeft),
 	}
-	return queueAndClient{queue: instanceResult[queueRecord]{recs: recs}, client: summary}
+	return queueAndDownloadClient{queue: instanceResult[queueRecord]{recs: recs}, downloadClient: summary}
 }
 
 // joinDownloads makes one row of each Download that a Media App and a
