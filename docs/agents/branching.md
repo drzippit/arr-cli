@@ -40,7 +40,7 @@ Tag only commits on `main`. The Release workflow fails a tag that is not on `mai
 
 Two layers keep `main` locked.
 
-**On GitHub**, a ruleset on `main` requires a PR and a passing CI `test` check, and blocks force-pushes and deleting `main`. No approval is needed, and nobody can bypass it, the owner included. If history ever has to be rewritten again, turn the ruleset off by hand for that one push and back on straight after. GitHub can only enforce the ruleset on a public repository (on the Free plan), so it is set up when the repository goes public (#14).
+**On GitHub**, a ruleset on `main` requires a PR and a passing CI `test` check, and blocks force-pushes and deleting `main`. No approval is needed, and nobody can bypass it, the owner included. If history ever has to be rewritten again, turn the ruleset off by hand for that one push and back on straight after. The ruleset is called "Lock main" in the repository's settings.
 
 **Locally**, hooks refuse the same things before they reach GitHub:
 
