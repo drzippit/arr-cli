@@ -19,7 +19,7 @@ func TestHistoryListsFinishedDownloadsNewestFirst(t *testing.T) {
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
 	for _, want := range []string{
-		"INSTANCE", "FINISHED", "TITLE", "STATUS", "SIZE", "CATEGORY", "REASON",
+		"INSTANCE", "FINISHED", "RELEASE", "STATUS", "SIZE", "CATEGORY", "REASON",
 		"2026-11-27 10:00", "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE", "completed", "18.0 GiB", "movies",
 		"2026-11-27 07:13", "Some.Broken.Upload.x264-NOGRP", "failed", "Download failed - Not on your server(s)",
 	} {
@@ -79,7 +79,7 @@ func TestHistoryLimitKeepsTheNewest(t *testing.T) {
 		t.Fatalf("want 1 record: %v\n%s", err, out)
 	}
 	want := map[string]any{
-		"instance": "sab", "app": "sabnzbd", "title": "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE",
+		"instance": "sab", "app": "sabnzbd", "release": "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE",
 		"downloadId": "SABnzbd_nzo_done111", "status": "completed", "size": float64(19327352832),
 		"category": "movies", "finished": "2026-11-27T09:00:00Z",
 	}

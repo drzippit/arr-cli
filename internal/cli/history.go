@@ -14,13 +14,14 @@ import (
 	"github.com/drzippit/arr-cli/internal/sabapi"
 )
 
-// historyRecord is one finished Download in a Download Client's History.
+// historyRecord is one finished Download in a Download Client's History,
+// known by its Release, since only a Media App knows the Title it is for.
 // Status is completed or failed, and FailMessage says why a failed one
 // failed.
 type historyRecord struct {
 	Instance    string     `json:"instance"`
 	App         config.App `json:"app"`
-	Title       string     `json:"title"`
+	Release     string     `json:"release"`
 	DownloadID  string     `json:"downloadId"`
 	Status      string     `json:"status"`
 	Size        int64      `json:"size"`
@@ -95,7 +96,7 @@ func fetchHistory(ctx context.Context, inst config.Instance, limit int, failedOn
 			continue
 		}
 		recs = append(recs, historyRecord{
-			Instance: inst.Name, App: inst.App, Title: s.Name, DownloadID: s.NzoID,
+			Instance: inst.Name, App: inst.App, Release: s.Name, DownloadID: s.NzoID,
 			Status: strings.ToLower(s.Status), Size: s.Bytes, Category: s.Category,
 			Finished: time.Unix(s.Completed, 0).UTC(), FailMessage: s.FailMessage,
 		})
@@ -121,9 +122,9 @@ func renderHistory(w io.Writer, recs []historyRecord, asJSON bool) error {
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
 		rows = append(rows, []string{
-			r.Instance, r.Finished.In(loc).Format("2006-01-02 15:04"), r.Title, r.Status,
+			r.Instance, r.Finished.In(loc).Format("2006-01-02 15:04"), r.Release, r.Status,
 			formatSize(r.Size), orDash(r.Category), orDash(r.FailMessage),
 		})
 	}
-	return renderTable(w, []string{"INSTANCE", "FINISHED", "TITLE", "STATUS", "SIZE", "CATEGORY", "REASON"}, rows)
+	return renderTable(w, []string{"INSTANCE", "FINISHED", "RELEASE", "STATUS", "SIZE", "CATEGORY", "REASON"}, rows)
 }
