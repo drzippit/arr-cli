@@ -82,8 +82,8 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 	src := &instanceSource{path: config.Path()}
 	root.AddCommand(newStatusCmd(src.all, flags))
 	root.AddCommand(newQueueCmd(src.all, flags))
-	root.AddCommand(newCalendarCmd(src.all, flags))
-	root.AddCommand(newListCmd(src.all, flags))
+	root.AddCommand(newCalendarCmd(src.mediaApps, flags))
+	root.AddCommand(newListCmd(src.mediaApps, flags))
 	root.AddCommand(newConfigCmd(src, flags))
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
@@ -158,6 +158,25 @@ func (s *instanceSource) all() ([]config.Instance, error) {
 	return s.instances, nil
 }
 
+// mediaApps is all, keeping only the Instances of Media Apps, for commands
+// about Titles and Libraries.
+func (s *instanceSource) mediaApps() ([]config.Instance, error) {
+	insts, err := s.all()
+	if err != nil {
+		return nil, err
+	}
+	var out []config.Instance
+	for _, inst := range insts {
+		if inst.App.Kind() == config.MediaApp {
+			out = append(out, inst)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no Sonarr or Radarr Instances configured in %s; add one with arr config add", s.path)
+	}
+	return out, nil
+}
+
 func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   inst.Name,
@@ -170,9 +189,11 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	only := func() ([]config.Instance, error) { return []config.Instance{inst}, nil }
 	cmd.AddCommand(newStatusCmd(only, flags))
 	cmd.AddCommand(newQueueCmd(only, flags))
-	cmd.AddCommand(newCalendarCmd(only, flags))
-	cmd.AddCommand(newListCmd(only, flags))
-	cmd.AddCommand(newSearchCmd(inst, flags))
+	if inst.App.Kind() == config.MediaApp {
+		cmd.AddCommand(newCalendarCmd(only, flags))
+		cmd.AddCommand(newListCmd(only, flags))
+		cmd.AddCommand(newSearchCmd(inst, flags))
+	}
 	switch inst.App {
 	case config.Sonarr:
 		cmd.AddCommand(newAddSeriesCmd(inst, flags))
