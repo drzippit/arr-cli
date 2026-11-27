@@ -535,46 +535,80 @@ func TestIntegrationListFiltersOfSonarr(t *testing.T) {
 	}
 }
 
+// addTitle adds the Title with this TVDB (Sonarr) or TMDB (Radarr) ID to
+// inst with the given quality profile, without searching, and returns its
+// title. A Series gets every episode monitored.
+func addTitle(t *testing.T, inst instanceDef, id int, quality string) string {
+	t.Helper()
+	args := []string{inst.app, "add", "--quality", quality, "--no-search"}
+	key := "tmdbId"
+	if inst.app == "sonarr" {
+		ensureRootFolder(t, inst, "/tv")
+		args = append(args, "--tvdb", fmt.Sprint(id), "--root", "/tv", "--monitor", "all")
+		key = "tvdbId"
+	} else {
+		ensureRootFolder(t, inst, "/movies")
+		args = append(args, "--tmdb", fmt.Sprint(id), "--root", "/movies")
+	}
+	if out, stderr, code := run(t, args...); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	for _, r := range records(t, inst.app, "list", "--json") {
+		if r[key] == float64(id) {
+			return r["title"].(string)
+		}
+	}
+	t.Fatalf("added Title %d not listed", id)
+	return ""
+}
+
 func TestIntegrationEditChangesMonitoringAndQuality(t *testing.T) {
 	cases := []struct {
-		app, root, key, flag string
-		id                   int
-		addArgs              []string
+		app, key string
+		id       int
 	}{
-		{"radarr", "/movies", "tmdbId", "--tmdb", 348, nil},                        // Alien
-		{"sonarr", "/tv", "tvdbId", "--tvdb", 78874, []string{"--monitor", "all"}}, // Firefly
+		{"radarr", "tmdbId", 348},   // Alien
+		{"sonarr", "tvdbId", 78874}, // Firefly
 	}
 	for _, c := range cases {
 		t.Run(c.app, func(t *testing.T) {
 			inst := realInstanceFor(t, c.app)
 			useConfig(t, inst)
-			ensureRootFolder(t, inst, c.root)
-			add := append([]string{c.app, "add", c.flag, fmt.Sprint(c.id), "--quality", "HD-1080p", "--root", c.root, "--no-search"}, c.addArgs...)
-			if out, stderr, code := run(t, add...); code != 0 {
-				t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
-			}
-			var added map[string]any
-			for _, r := range records(t, c.app, "list", "--json") {
-				if r[c.key] == float64(c.id) {
-					added = r
-				}
-			}
-			if added == nil {
-				t.Fatalf("added Title not listed")
-			}
-			query := added["title"].(string)
+			title := addTitle(t, inst, c.id, "HD-1080p")
 
-			out, stderr, code := run(t, c.app, "edit", query, "--set-monitored=false", "--set-quality", "Any", "--yes")
+			out, stderr, code := run(t, c.app, "edit", title, "--set-monitored=false", "--set-quality", "Any", "--yes")
 			if code != 0 {
 				t.Fatalf("edit: exit code %d, stderr: %s\n%s", code, stderr, out)
 			}
 
-			for _, r := range records(t, c.app, "list", "--json", "--unmonitored", "--quality", "Any") {
-				if r[c.key] == float64(c.id) {
-					return
-				}
+			if !listed(t, c.key, c.id, c.app, "list", "--json", "--unmonitored", "--quality", "Any") {
+				t.Errorf("after edit, list --unmonitored --quality Any should show %s", title)
 			}
-			t.Errorf("after edit, list --unmonitored --quality Any should show %s", query)
+		})
+	}
+}
+
+func TestIntegrationHuntIsTakenByTheApp(t *testing.T) {
+	cases := []struct {
+		app, key string
+		id       int
+	}{
+		{"radarr", "tmdbId", 578},   // Jaws
+		{"sonarr", "tvdbId", 76321}, // Freaks and Geeks
+	}
+	for _, c := range cases {
+		t.Run(c.app, func(t *testing.T) {
+			inst := realInstanceFor(t, c.app)
+			useConfig(t, inst)
+			title := addTitle(t, inst, c.id, "Any")
+
+			// The test Instances have no indexers, but the App still takes
+			// the search command; it only finds nothing.
+			recs := records(t, c.app, "hunt", title, "--yes", "--json")
+
+			if len(recs) != 1 || recs[0][c.key] != float64(c.id) || recs[0]["hunt"] != "queued" {
+				t.Errorf("want the Title's Hunt queued, got %v", recs)
+			}
 		})
 	}
 }
