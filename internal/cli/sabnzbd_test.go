@@ -223,8 +223,8 @@ func TestSabnzbdInstanceHasNoMediaAppCommands(t *testing.T) {
 		}
 	}
 	got := complete(t, "sab", "")
-	if strings.Join(got, " ") != "queue status" {
-		t.Errorf("completion for arr sab offers %v, want queue and status", got)
+	if strings.Join(got, " ") != "history queue status" {
+		t.Errorf("completion for arr sab offers %v, want history, queue and status", got)
 	}
 }
 

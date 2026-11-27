@@ -140,6 +140,7 @@ arr radarr-4k status    # just radarr-4k
 | `arr [<instance>] queue` | Downloads in progress, with progress and time left. `arr queue` shows each Download once: one that Sonarr or Radarr grabbed and SABnzbd is fetching shows the Title and episode, with SABnzbd's live progress, priority and category, and one you added to SABnzbd by hand shows under its own name. `arr <instance> queue` shows just what that Instance reports, and for SABnzbd that includes Downloads it is still verifying, repairing or unpacking. |
 | `arr [<instance>] calendar` | Episodes and Movie releases due this month, as a grid in a wide enough terminal. `--month 2026-12`, `--month next` or `prev` picks another month; `--list` gives a list by date; `--unmonitored` includes unmonitored ones. |
 | `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. `--plain` prints one Title per line. |
+| `arr [<instance>] history` | Downloads SABnzbd has finished, newest first, with why a failed one failed. `--failed` shows only failed ones; `--limit 50` shows more than the 20 it shows by default. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
 | `arr <sonarr> add [query]` | Add a Series. See [Adding Titles](#adding-titles). |
 | `arr <radarr> add [query]` | Add a Movie. See [Adding Titles](#adding-titles). |
@@ -147,7 +148,7 @@ arr radarr-4k status    # just radarr-4k
 | `arr config list` | The Instances in the config, with API keys hidden. |
 | `arr completion <shell>` | A completion script for fish, zsh or bash. |
 
-`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status` and `queue` for now.
+`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status`, `queue` and `history`. `history` covers SABnzbd only.
 
 Every command takes `--json` to print JSON instead of a table, and `--help` for its flags.
 

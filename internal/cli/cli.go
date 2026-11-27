@@ -84,6 +84,7 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 	root.AddCommand(newQueueCmd(src.all, true, flags))
 	root.AddCommand(newCalendarCmd(src.mediaApps, flags))
 	root.AddCommand(newListCmd(src.mediaApps, flags))
+	root.AddCommand(newHistoryCmd(src.downloadClients, flags))
 	root.AddCommand(newConfigCmd(src, flags))
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
@@ -161,18 +162,29 @@ func (s *instanceSource) all() ([]config.Instance, error) {
 // mediaApps is all, keeping only the Instances of Media Apps, for commands
 // about Titles and Libraries.
 func (s *instanceSource) mediaApps() ([]config.Instance, error) {
+	return s.ofKind(config.MediaApp, "Sonarr or Radarr")
+}
+
+// downloadClients is all, keeping only the Instances of Download Clients.
+func (s *instanceSource) downloadClients() ([]config.Instance, error) {
+	return s.ofKind(config.DownloadClient, "SABnzbd")
+}
+
+// ofKind is all, keeping only the Instances of Apps of kind, which apps
+// names for the error when there are none.
+func (s *instanceSource) ofKind(kind config.Kind, apps string) ([]config.Instance, error) {
 	insts, err := s.all()
 	if err != nil {
 		return nil, err
 	}
 	var out []config.Instance
 	for _, inst := range insts {
-		if inst.App.Kind() == config.MediaApp {
+		if inst.App.Kind() == kind {
 			out = append(out, inst)
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no Sonarr or Radarr Instances configured in %s; add one with arr config add", s.path)
+		return nil, fmt.Errorf("no %s Instances configured in %s; add one with arr config add", apps, s.path)
 	}
 	return out, nil
 }
@@ -189,6 +201,9 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	only := func() ([]config.Instance, error) { return []config.Instance{inst}, nil }
 	cmd.AddCommand(newStatusCmd(only, flags))
 	cmd.AddCommand(newQueueCmd(only, false, flags))
+	if inst.App.Kind() == config.DownloadClient {
+		cmd.AddCommand(newHistoryCmd(only, flags))
+	}
 	if inst.App.Kind() == config.MediaApp {
 		cmd.AddCommand(newCalendarCmd(only, flags))
 		cmd.AddCommand(newListCmd(only, flags))

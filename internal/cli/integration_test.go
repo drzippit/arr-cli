@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/drzippit/arr-cli/internal/config"
 )
@@ -395,6 +396,50 @@ func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
 	}
 	if found["release"] != "Arr.Cli.Queue.Test" || found["title"] != nil || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
 		t.Errorf("want the paused Download with its position and size, got %v", found)
+	}
+}
+
+func TestIntegrationHistoryOfSabnzbdShowsAFailedDownload(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, sab)
+	// Against nntp-stub, which has no articles, the Download fails at once.
+	id := addNZB(t, sab, "Arr.Cli.History.Test", 0)
+
+	r := awaitFailedDownload(t, id, "sabnzbd", "history", "--failed", "--json")
+
+	if r["release"] != "Arr.Cli.History.Test" || r["title"] != nil || r["status"] != "failed" || r["failMessage"] == nil {
+		t.Errorf("want the failed Download with why it failed, got %v", r)
+	}
+}
+
+func TestIntegrationHistoryAcrossInstancesCoversSabnzbd(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, realInstanceFor(t, "sonarr"), realInstanceFor(t, "radarr"), sab)
+	id := addNZB(t, sab, "Arr.Cli.History.Across.Test", 0)
+
+	r := awaitFailedDownload(t, id, "history", "--json")
+
+	if r["instance"] != "sabnzbd" || r["status"] != "failed" {
+		t.Errorf("want SABnzbd's failed Download, got %v", r)
+	}
+}
+
+// awaitFailedDownload runs arr with args, which list History records as
+// JSON, until the Download with ID id is among them, and returns its record.
+// It gives up after 60s.
+func awaitFailedDownload(t *testing.T, id string, args ...string) map[string]any {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		for _, r := range records(t, args...) {
+			if r["downloadId"] == id {
+				return r
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Download %s not in arr %s after 60s", id, strings.Join(args, " "))
+		}
+		time.Sleep(time.Second)
 	}
 }
 

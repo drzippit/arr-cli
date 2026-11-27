@@ -20,6 +20,7 @@ Ctrl-C stops the tests and still removes the containers, and each run first remo
 
 - Each image is pinned to an exact release in `integration/compose.yaml`. To test against a newer release, change the tag, run `make integration`, and commit both together. Tests check the major and minor version (" 4.0.", " 7.0.", "5.1."), so a patch release needs no test change, but a new minor or major release means updating those checks too.
 - The API keys are fixed in the `Makefile` and handed to the Apps through their environment, so the tests know them without reading the Apps' config files. SABnzbd reads its key only from its config file, so its service writes a new `sabnzbd.ini` holding the key before SABnzbd starts.
+- SABnzbd's news server is `nntp-stub` (`integration/nntp-stub/stub.py`), which has no articles. A Download added at a normal priority fails within seconds and lands in the failed History; one added paused (priority −2, as `addNZB` takes) stays in the Queue. Nothing ever downloads, so a test can't expect progress.
 - Every run starts from new Instances: Sonarr and Radarr with an empty Library, SABnzbd with an empty Queue. All tests in one run share the same Instances, so a test that changes one (adding a Title, say) must not depend on running before or after another. Keep the integration tests in `internal/cli`: tests in another package would run at the same time as these, against the same Instances.
 - A new Instance has the App's default quality profiles but no root folder. The Sonarr container has an empty `/tv` folder and the Radarr one an empty `/movies`; a test that adds a Title first makes that folder a root folder by POSTing `{"path": "/tv"}` (or `"/movies"`) to the Instance's `/api/v3/rootfolder`. The App refuses a folder that does not exist in its container.
 
@@ -45,6 +46,7 @@ Helpers in `integration_test.go`:
 
 - `records(t, args...)` runs arr with `--json` among `args` and returns its records, failing unless the output is a JSON list whose records each name their Instance and App.
 - `useBothInstances(t)` puts both real Instances in the config, for commands that run across every Instance.
+- `addNZB(t, inst, name, priority)` uploads a small NZB to SABnzbd under `name` and returns its `nzo_id`.
 - `ensureRootFolder(t, inst, "/movies")` makes a folder a root folder of the Instance unless it already is; `add` needs one.
 
 A test that changes an Instance keeps every step that depends on that change in one test, in order: `TestIntegrationAddThenListMovie` adds The Matrix, lists it, and checks a second add is refused. The `search` and `add` tests go through the App to its metadata service, so they need the internet and fail while that service is down; re-run the Release once it is back.

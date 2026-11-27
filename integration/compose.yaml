@@ -6,8 +6,10 @@
 # their environment settings, so the tests know them without reading the
 # Apps' config files. /tv and /movies are empty folders a test can make a root
 # folder. SABnzbd takes no API key from its environment, so its service
-# writes one into a new sabnzbd.ini before SABnzbd starts. Nothing is kept
-# between runs.
+# writes one into a new sabnzbd.ini before SABnzbd starts, along with
+# nntp-stub as its news server: a server with no articles, so a Download that
+# isn't paused fails within seconds and lands in SABnzbd's History. Nothing is
+# kept between runs.
 
 x-instance: &instance
   environment: &env
@@ -58,9 +60,24 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - mkdir -p /config && printf '[misc]\napi_key = %s\n' "$$SABNZBD_API_KEY" > /config/sabnzbd.ini && exec /init
+      - >-
+        mkdir -p /config &&
+        printf '[misc]\napi_key = %s\n[servers]\n[[nntp-stub]]\nname = nntp-stub\nhost = nntp-stub\nport = 119\nconnections = 1\nenable = 1\n'
+        "$$SABNZBD_API_KEY" > /config/sabnzbd.ini &&
+        exec /init
     ports:
       - "127.0.0.1:${ARR_IT_SABNZBD_PORT:?set by make integration}:8080"
     healthcheck:
       <<: *health
       test: ["CMD-SHELL", "curl -fsS \"http://localhost:8080/api?mode=queue&output=json&apikey=$$SABNZBD_API_KEY\""]
+    depends_on:
+      - nntp-stub
+
+  nntp-stub:
+    image: python:3.13.18-alpine3.24
+    command: ["python", "-u", "/stub.py"]
+    volumes:
+      - ./nntp-stub/stub.py:/stub.py:ro
+    healthcheck:
+      <<: *health
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 119), 2)"]
