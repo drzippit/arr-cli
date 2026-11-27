@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/drzippit/arr-cli/internal/config"
 )
@@ -364,5 +365,29 @@ func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
 	}
 	if found["title"] != "Arr.Cli.Queue.Test" || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
 		t.Errorf("want the paused Download with its position and size, got %v", found)
+	}
+}
+
+func TestIntegrationHistoryOfSabnzbdShowsAFailedDownload(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, sab)
+	// Against nntp-stub, which has no articles, the Download fails at once.
+	id := addNZB(t, sab, "Arr.Cli.History.Test", 0)
+
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		for _, r := range records(t, "sabnzbd", "history", "--failed", "--json") {
+			if r["downloadId"] != id {
+				continue
+			}
+			if r["title"] != "Arr.Cli.History.Test" || r["status"] != "failed" || r["failMessage"] == nil {
+				t.Errorf("want the failed Download with why it failed, got %v", r)
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Download %s not in the failed History after 60s", id)
+		}
+		time.Sleep(time.Second)
 	}
 }
