@@ -36,6 +36,8 @@ git switch main && git pull --ff-only
 
 Tag only commits on `main`. The Release workflow fails a tag that is not on `main`, or that is not SemVer (ADR 0004), and runs the integration tests before publishing.
 
+A Release needs no README change: the install steps look up the latest release themselves, and the release badge reads it from GitHub. So no "Point the README at …" PR follows a tag, and a Release's notes list only the changes it ships.
+
 ## How main is kept locked
 
 Two layers keep `main` locked.
