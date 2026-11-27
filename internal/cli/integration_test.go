@@ -300,6 +300,37 @@ func TestIntegrationConfigAddSavesSonarr(t *testing.T) {
 	}
 }
 
+func TestIntegrationConfigAddSavesSabnzbdAndRefusesAWrongKey(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	path := useMissingConfig(t)
+	fillForm(t, config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: "wrong"})
+
+	_, stderr, code := run(t, "config", "add")
+
+	if code != 1 || !strings.Contains(stderr, "check the API key") {
+		t.Errorf("a wrong key: exit code %d, stderr %q", code, stderr)
+	}
+
+	want := config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: sab.key}
+	fillForm(t, want)
+
+	out, stderr, code := run(t, "config", "add")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	if !strings.Contains(out, "Added sabnzbd (SABnzbd 5.1.") {
+		t.Errorf("want the App and version named:\n%s", out)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config after add: %v", err)
+	}
+	if len(cfg.Instances) != 1 || cfg.Instances[0] != want {
+		t.Errorf("Instances %+v, want %+v", cfg.Instances, want)
+	}
+}
+
 func TestIntegrationConfigAddRefusesSonarrAsRadarr(t *testing.T) {
 	sonarr := realInstanceFor(t, "sonarr")
 	path := useMissingConfig(t)
