@@ -43,6 +43,9 @@ type Queue struct {
 	// Downloads are fetched into and of the one they end up in.
 	DiskSpace1 number `json:"diskspace1"`
 	DiskSpace2 number `json:"diskspace2"`
+	// TimeLeft is the time left for the whole queue, as h:mm:ss, or
+	// d:hh:mm:ss from a day on.
+	TimeLeft string `json:"timeleft"`
 	// Slots are the Downloads waiting or being fetched, in queue order.
 	Slots []QueueSlot `json:"slots"`
 }
