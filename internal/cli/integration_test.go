@@ -491,7 +491,9 @@ func TestIntegrationListFiltersOfRadarr(t *testing.T) {
 	if out, stderr, code := run(t, "radarr", "add", "--tmdb", "949", "--quality", "HD-1080p", "--root", "/movies", "--no-search"); code != 0 {
 		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
 	}
-	heat := func(args ...string) bool { return listed(t, "tmdbId", 949, append([]string{"radarr", "list", "--json"}, args...)...) }
+	heat := func(args ...string) bool {
+		return listed(t, "tmdbId", 949, append([]string{"radarr", "list", "--json"}, args...)...)
+	}
 
 	for _, f := range [][]string{{"--monitored"}, {"--quality", "hd-1080p"}, {"--status", "released"}, {"--missing"}} {
 		if !heat(f...) {
@@ -513,7 +515,9 @@ func TestIntegrationListFiltersOfSonarr(t *testing.T) {
 	if out, stderr, code := run(t, "sonarr", "add", "--tvdb", "79126", "--quality", "HD-1080p", "--root", "/tv", "--monitor", "all", "--no-search"); code != 0 {
 		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
 	}
-	wire := func(args ...string) bool { return listed(t, "tvdbId", 79126, append([]string{"sonarr", "list", "--json"}, args...)...) }
+	wire := func(args ...string) bool {
+		return listed(t, "tvdbId", 79126, append([]string{"sonarr", "list", "--json"}, args...)...)
+	}
 
 	// Sonarr fetches the episodes in the background after adding.
 	if !eventually(func() bool { return wire("--missing") }) {
