@@ -393,7 +393,7 @@ func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
 	if found == nil {
 		t.Fatalf("Download %s not in the queue", id)
 	}
-	if found["title"] != "Arr.Cli.Queue.Test" || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
+	if found["release"] != "Arr.Cli.Queue.Test" || found["title"] != nil || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
 		t.Errorf("want the paused Download with its position and size, got %v", found)
 	}
 }
