@@ -11,7 +11,9 @@
     "studio": "Warner Bros. Pictures",
     "tmdbId": 603,
     "imdbId": "tt0133093",
-    "id": 2
+    "id": 2,
+    "qualityProfileId": 4,
+    "isAvailable": true
   },
   {
     "title": "Good Will Hunting",
@@ -25,7 +27,9 @@
     "studio": "Miramax",
     "tmdbId": 489,
     "imdbId": "tt0119217",
-    "id": 1
+    "id": 1,
+    "qualityProfileId": 5,
+    "isAvailable": true
   },
   {
     "title": "Project Hail Mary",
@@ -39,6 +43,8 @@
     "studio": "Amazon MGM Studios",
     "tmdbId": 687163,
     "imdbId": "tt12042730",
-    "id": 81
+    "id": 81,
+    "qualityProfileId": 1,
+    "isAvailable": true
   }
 ]

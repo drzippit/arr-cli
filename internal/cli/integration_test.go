@@ -462,3 +462,153 @@ func TestIntegrationQueueAcrossMediaAppsAndSabnzbdShowsAHandAddedDownloadOnce(t 
 		t.Errorf("want SABnzbd's own row, by its release and with no Title: %v", r)
 	}
 }
+
+// listed reports whether arr list with args, which must include --json,
+// shows the Title whose key (tvdbId or tmdbId) is id.
+func listed(t *testing.T, key string, id int, args ...string) bool {
+	t.Helper()
+	return slices.ContainsFunc(records(t, args...), func(r map[string]any) bool { return r[key] == float64(id) })
+}
+
+// eventually retries ok for up to 60s, for what an App does in the
+// background after a change.
+func eventually(ok func() bool) bool {
+	deadline := time.Now().Add(60 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Second)
+	}
+	return true
+}
+
+func TestIntegrationListFiltersOfRadarr(t *testing.T) {
+	radarr := realInstanceFor(t, "radarr")
+	useConfig(t, radarr)
+	ensureRootFolder(t, radarr, "/movies")
+	// Heat (1995): out long ago, so available, and with no file it is Missing.
+	if out, stderr, code := run(t, "radarr", "add", "--tmdb", "949", "--quality", "HD-1080p", "--root", "/movies", "--no-search"); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	heat := func(args ...string) bool {
+		return listed(t, "tmdbId", 949, append([]string{"radarr", "list", "--json"}, args...)...)
+	}
+
+	for _, f := range [][]string{{"--monitored"}, {"--quality", "hd-1080p"}, {"--status", "released"}, {"--missing"}} {
+		if !heat(f...) {
+			t.Errorf("list %v should show Heat", f)
+		}
+	}
+	for _, f := range [][]string{{"--unmonitored"}, {"--quality", "Any"}, {"--status", "announced"}} {
+		if heat(f...) {
+			t.Errorf("list %v should not show Heat", f)
+		}
+	}
+}
+
+func TestIntegrationListFiltersOfSonarr(t *testing.T) {
+	sonarr := realInstanceFor(t, "sonarr")
+	useConfig(t, sonarr)
+	ensureRootFolder(t, sonarr, "/tv")
+	// The Wire: ended, and with every episode monitored and none on disk, Missing.
+	if out, stderr, code := run(t, "sonarr", "add", "--tvdb", "79126", "--quality", "HD-1080p", "--root", "/tv", "--monitor", "all", "--no-search"); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	wire := func(args ...string) bool {
+		return listed(t, "tvdbId", 79126, append([]string{"sonarr", "list", "--json"}, args...)...)
+	}
+
+	// Sonarr fetches the episodes in the background after adding.
+	if !eventually(func() bool { return wire("--missing") }) {
+		t.Errorf("list --missing should show The Wire once Sonarr has its episodes")
+	}
+	for _, f := range [][]string{{"--monitored"}, {"--quality", "HD-1080p"}, {"--status", "ended"}} {
+		if !wire(f...) {
+			t.Errorf("list %v should show The Wire", f)
+		}
+	}
+	for _, f := range [][]string{{"--unmonitored"}, {"--quality", "Any"}, {"--status", "continuing"}} {
+		if wire(f...) {
+			t.Errorf("list %v should not show The Wire", f)
+		}
+	}
+}
+
+// addTitle adds the Title with this TVDB (Sonarr) or TMDB (Radarr) ID to
+// inst with the given quality profile, without searching, and returns its
+// title. A Series gets every episode monitored.
+func addTitle(t *testing.T, inst instanceDef, id int, quality string) string {
+	t.Helper()
+	args := []string{inst.app, "add", "--quality", quality, "--no-search"}
+	key := "tmdbId"
+	if inst.app == "sonarr" {
+		ensureRootFolder(t, inst, "/tv")
+		args = append(args, "--tvdb", fmt.Sprint(id), "--root", "/tv", "--monitor", "all")
+		key = "tvdbId"
+	} else {
+		ensureRootFolder(t, inst, "/movies")
+		args = append(args, "--tmdb", fmt.Sprint(id), "--root", "/movies")
+	}
+	if out, stderr, code := run(t, args...); code != 0 {
+		t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	for _, r := range records(t, inst.app, "list", "--json") {
+		if r[key] == float64(id) {
+			return r["title"].(string)
+		}
+	}
+	t.Fatalf("added Title %d not listed", id)
+	return ""
+}
+
+func TestIntegrationEditChangesMonitoringAndQuality(t *testing.T) {
+	cases := []struct {
+		app, key string
+		id       int
+	}{
+		{"radarr", "tmdbId", 348},   // Alien
+		{"sonarr", "tvdbId", 78874}, // Firefly
+	}
+	for _, c := range cases {
+		t.Run(c.app, func(t *testing.T) {
+			inst := realInstanceFor(t, c.app)
+			useConfig(t, inst)
+			title := addTitle(t, inst, c.id, "HD-1080p")
+
+			out, stderr, code := run(t, c.app, "edit", title, "--set-monitored=false", "--set-quality", "Any", "--yes")
+			if code != 0 {
+				t.Fatalf("edit: exit code %d, stderr: %s\n%s", code, stderr, out)
+			}
+
+			if !listed(t, c.key, c.id, c.app, "list", "--json", "--unmonitored", "--quality", "Any") {
+				t.Errorf("after edit, list --unmonitored --quality Any should show %s", title)
+			}
+		})
+	}
+}
+
+func TestIntegrationHuntIsTakenByTheApp(t *testing.T) {
+	cases := []struct {
+		app, key string
+		id       int
+	}{
+		{"radarr", "tmdbId", 578},   // Jaws
+		{"sonarr", "tvdbId", 76321}, // Freaks and Geeks
+	}
+	for _, c := range cases {
+		t.Run(c.app, func(t *testing.T) {
+			inst := realInstanceFor(t, c.app)
+			useConfig(t, inst)
+			title := addTitle(t, inst, c.id, "Any")
+
+			// The test Instances have no indexers, but the App still takes
+			// the search command; it only finds nothing.
+			recs := records(t, c.app, "hunt", title, "--yes", "--json")
+
+			if len(recs) != 1 || recs[0][c.key] != float64(c.id) || recs[0]["hunt"] != "queued" {
+				t.Errorf("want the Title's Hunt queued, got %v", recs)
+			}
+		})
+	}
+}

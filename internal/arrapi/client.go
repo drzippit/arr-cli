@@ -187,6 +187,72 @@ func (c *Client) post(ctx context.Context, path string, body, into any) error {
 	return &StatusError{Method: http.MethodPost, Path: path, Code: resp.StatusCode}
 }
 
+// put sends body as JSON to path and expects 200 OK or 202 Accepted, the
+// answers of the Apps' bulk editors. When the App rejects the body, the error
+// gives the App's own reasons.
+func (c *Client) put(ctx context.Context, path string, body any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(ctx, http.MethodPut, path, nil, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return err
+	}
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusAccepted:
+		return nil
+	case http.StatusBadRequest:
+		if reasons := validationErrors(respBody); len(reasons) > 0 {
+			return fmt.Errorf("PUT %s: %s", endpoint(path), strings.Join(reasons, "; "))
+		}
+	}
+	return &StatusError{Method: http.MethodPut, Path: path, Code: resp.StatusCode}
+}
+
+// Edit is a change to many Titles at once through an App's bulk editor. A
+// nil field is left as it is.
+type Edit struct {
+	Monitored        *bool `json:"monitored,omitempty"`
+	QualityProfileID *int  `json:"qualityProfileId,omitempty"`
+}
+
+// EditSeries applies edit to the Series with these IDs in one request.
+func (c *Client) EditSeries(ctx context.Context, ids []int, edit Edit) error {
+	return c.put(ctx, "series/editor", struct {
+		SeriesIDs []int `json:"seriesIds"`
+		Edit
+	}{ids, edit})
+}
+
+// EditMovies applies edit to the Movies with these IDs in one request.
+func (c *Client) EditMovies(ctx context.Context, ids []int, edit Edit) error {
+	return c.put(ctx, "movie/editor", struct {
+		MovieIDs []int `json:"movieIds"`
+		Edit
+	}{ids, edit})
+}
+
+// SearchSeries asks Sonarr to search its indexers for the Series with this
+// ID, as its own search button does: every monitored episode, missing or
+// below the cutoff.
+func (c *Client) SearchSeries(ctx context.Context, id int) error {
+	var started struct{}
+	return c.post(ctx, "command", map[string]any{"name": "SeriesSearch", "seriesId": id}, &started)
+}
+
+// SearchMovies asks Radarr to search its indexers for the Movies with these
+// IDs, in one command.
+func (c *Client) SearchMovies(ctx context.Context, ids []int) error {
+	var started struct{}
+	return c.post(ctx, "command", map[string]any{"name": "MoviesSearch", "movieIds": ids}, &started)
+}
+
 // do sends one authenticated request to path. A body is sent as JSON.
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body io.Reader) (*http.Response, error) {
 	u := c.baseURL + endpoint(path)
@@ -306,6 +372,10 @@ type Movie struct {
 	HasFile    bool   `json:"hasFile"`
 	SizeOnDisk int64  `json:"sizeOnDisk"`
 	TmdbID     int    `json:"tmdbId"`
+	// IsAvailable says whether Radarr counts the Movie as out, by its
+	// minimum availability.
+	IsAvailable      bool `json:"isAvailable"`
+	QualityProfileID int  `json:"qualityProfileId"`
 }
 
 // Movies fetches every Movie in a Radarr Instance's Library.
@@ -329,6 +399,8 @@ type Series struct {
 	TvdbID     int              `json:"tvdbId"`
 	Seasons    []Season         `json:"seasons"`
 	Statistics SeriesStatistics `json:"statistics"`
+
+	QualityProfileID int `json:"qualityProfileId"`
 }
 
 // Season is one season of a Series. Season 0 holds the specials.

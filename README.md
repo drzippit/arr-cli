@@ -140,9 +140,11 @@ arr radarr-4k status    # just radarr-4k
 | `arr [<instance>] status` | Whether each Instance is reachable, its version, and how many Warnings it reports. For SABnzbd also whether it is downloading or paused, its speed, and the free space in its download folders. `-v` lists each Warning. |
 | `arr [<instance>] queue` | Downloads in progress, with progress and time left. `arr queue` shows each Download once: one that Sonarr or Radarr grabbed and SABnzbd is fetching shows the Title and episode, with SABnzbd's live progress, priority and category, and one you added to SABnzbd by hand shows under its own name. `arr <instance> queue` shows just what that Instance reports, and for SABnzbd that includes Downloads it is still verifying, repairing or unpacking. `-w` / `--watch` keeps it on screen and refreshes it every 2s (`--interval 5s` for another pace) until Ctrl-C, with SABnzbd's speed and time left underneath. |
 | `arr [<instance>] calendar` | Episodes and Movie releases due this month, as a grid in a wide enough terminal. `--month 2026-12`, `--month next` or `prev` picks another month; `--list` gives a list by date; `--unmonitored` includes unmonitored ones. |
-| `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. `--plain` prints one Title per line. |
+| `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. Filters narrow it further, and a Title must match them all: `--monitored` or `--unmonitored`; `--missing` (monitored and out, but without all its files); `--quality <profile>`; `--status <status>` in the App's own words, such as `ended` or `released`. `--plain` prints one Title per line. |
 | `arr [<instance>] history` | Downloads SABnzbd has finished, newest first, with why a failed one failed. `--failed` shows only failed ones; `--limit 50` shows more than the 20 it shows by default. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
+| `arr <instance> edit [query]` | Change many Titles at once: `--set-monitored=true\|false` and `--set-quality <profile>`. The query and `list`'s filters choose which. See [Changing many Titles](#changing-many-titles). |
+| `arr <instance> hunt [query]` | Ask Sonarr or Radarr to look through its indexers for Releases of many Titles at once, as its own search button does. Unlike `search`, which finds Titles to add, `hunt` looks for something to download. See [Changing many Titles](#changing-many-titles). |
 | `arr <sonarr> add [query]` | Add a Series. See [Adding Titles](#adding-titles). |
 | `arr <radarr> add [query]` | Add a Movie. See [Adding Titles](#adding-titles). |
 | `arr config add` | Add an Instance to the config, after checking `arr` can reach it. |
@@ -165,6 +167,33 @@ arr radarr add --tmdb 603 --no-search    # The Matrix, without searching yet
 `add` looks your query up, lets you pick a Candidate, and adds it monitored, then starts a search for it (`--no-search` skips the search). The quality profile and root folder come from `--quality` / `--root`, then the Instance's config, then a picker. For a Series, `--monitor` takes Sonarr's options: `all`, `future`, `missing`, `existing`, `firstSeason`, `latestSeason` or `none`. For a Movie, `--availability` sets when it counts as available.
 
 In a terminal, `arr` asks for whatever it's missing. From a script it never asks: it adds the only Candidate that matches, or fails and lists them so you can pass `--tvdb` / `--tmdb`, and it fails naming the flag and config key for any other setting it lacks.
+
+### Changing many Titles
+
+```sh
+arr sonarr list --missing --status ended          # preview: ended Series with episodes missing
+arr sonarr edit --missing --status ended --set-monitored=false
+arr radarr edit --quality HD-1080p --set-quality Ultra-HD --dry-run
+arr radarr hunt --missing                          # look for Releases of every Missing Movie
+```
+
+`edit` makes its Selection with the same query and filters as `list`, and changes it in one request to the App. `--set-monitored` sets only the Series' or Movie's own flag; a Series' episodes keep theirs. Then it prints each Title with what changed.
+
+Both `edit` and `hunt` guard against changing more than you meant to (see [ADR 0006](docs/adr/0006-bulk-commands-guard-their-selection.md)):
+
+- In a terminal they first list the Titles they matched, all ticked, so you can untick any to leave out, then say what they will do and ask. From a script they refuse unless you pass `--yes`, or `--dry-run`, which shows the plan and changes nothing.
+- With no query and no filter they would act on the whole Library, so you have to pass `--all` for that.
+- They work on one named Instance at a time, and refuse a Sonarr or Radarr older than arr supports.
+
+When nothing matches, it says so, changes nothing, and exits 0.
+
+For a Selection no filter can express, pass `-` in place of the query and give the TVDB (Sonarr) or TMDB (Radarr) IDs on stdin: one per line, or the JSON `arr list --json` prints for the same Instance. Filters still narrow what comes in. Since stdin is then a pipe, arr can't ask, so `-` needs `--yes` or `--dry-run`:
+
+```sh
+arr sonarr list --json --monitored | jq '[.[] | select(.seasons > 5)]' | arr sonarr edit - --set-quality HD-1080p --yes
+```
+
+`hunt` makes its Selection the same way and asks the App to Hunt each Title, as its own search button does: one command per Series in Sonarr, one for all the Movies in Radarr. Each Title's Hunt counts against your indexers' API limits, so a Hunt over more than 25 Titles is refused unless you pass `--max <n>` or `--all`; `--dry-run` previews it anyway. Its HUNT column (`hunt` in `--json`) says whether the App took each one. If some failed, `hunt` still tries the rest, names the failures on stderr, and exits 1.
 
 ### In scripts
 

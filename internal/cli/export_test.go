@@ -54,3 +54,25 @@ func SetWatchFrames(t testing.TB, frames int) {
 	watchWait = func(context.Context, time.Duration) bool { return true }
 	t.Cleanup(func() { watchFrames, watchWait = prevFrames, prevWait })
 }
+
+// SetConfirm makes the CLI act as if it runs in a terminal, calling confirm
+// whenever it would ask a yes/no question, until t ends.
+func SetConfirm(t testing.TB, confirm func(question string) (bool, error)) {
+	prev := newConfirmer
+	newConfirmer = func(io.Reader, io.Writer) confirmer { return confirm }
+	t.Cleanup(func() { newConfirmer = prev })
+}
+
+// RunWithStdin is Run with stdin as standard input.
+func RunWithStdin(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return run(args, stdin, stdout, stderr)
+}
+
+// SetPicker makes the CLI act as if it runs in a terminal, calling pick
+// whenever it would let the person untick some of options, all ticked to start
+// with, until t ends. pick returns the indexes left ticked.
+func SetPicker(t testing.TB, pick func(title string, options []string) ([]int, error)) {
+	prev := newPicker
+	newPicker = func(io.Reader, io.Writer) picker { return pick }
+	t.Cleanup(func() { newPicker = prev })
+}
