@@ -188,7 +188,7 @@ Completion offers the top-level commands and your Instance names (`arr ra<TAB>`)
 
 ## Supported App versions
 
-`arr` supports **Sonarr 4 and later**, **Radarr 5 and later** and **SABnzbd 4 and later**, the current major versions. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
+`arr` supports **Sonarr 4 and later** and **Radarr 5 and later**, the current major versions, and **SABnzbd 4 and later**: `arr` only reads from SABnzbd, and versions 4 and 5 answer it alike. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
 
 ## Versioning
 
