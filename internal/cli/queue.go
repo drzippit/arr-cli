@@ -12,10 +12,13 @@ import (
 
 	"github.com/drzippit/arr-cli/internal/arrapi"
 	"github.com/drzippit/arr-cli/internal/config"
+	"github.com/drzippit/arr-cli/internal/sabapi"
 )
 
-// queueRecord is one download in progress on one Instance. Season, Episode and
-// EpisodeTitle are set for Sonarr, Year for Radarr.
+// queueRecord is one Download in progress on one Instance. Season, Episode and
+// EpisodeTitle are set for Sonarr, Year for Radarr. Priority, Category and
+// Position (from 1, in queue order) are set for Download Clients; a Download
+// being post-processed has no Position.
 type queueRecord struct {
 	Instance            string     `json:"instance"`
 	App                 config.App `json:"app"`
@@ -33,6 +36,10 @@ type queueRecord struct {
 	Status              string     `json:"status"`
 	DownloadClient      string     `json:"downloadClient"`
 	Protocol            string     `json:"protocol"`
+	DownloadID          string     `json:"downloadId,omitempty"`
+	Priority            string     `json:"priority,omitempty"`
+	Category            string     `json:"category,omitempty"`
+	Position            *int       `json:"position,omitempty"`
 }
 
 // newQueueCmd builds a queue command for the Instances that instances returns:
@@ -62,6 +69,9 @@ func fetchQueue(ctx context.Context, inst config.Instance) instanceResult[queueR
 	if err != nil {
 		return instanceResult[queueRecord]{err: err}
 	}
+	if inst.App.Kind() == config.DownloadClient {
+		return fetchSabnzbdQueue(ctx, inst, sabapi.New(inst.URL, key))
+	}
 	items, err := arrapi.New(inst.URL, key).Queue(ctx)
 	if err != nil {
 		return instanceResult[queueRecord]{err: err}
@@ -86,6 +96,7 @@ func newQueueRecord(inst config.Instance, it arrapi.QueueItem) queueRecord {
 		Status:              queueStatus(it),
 		DownloadClient:      it.DownloadClient,
 		Protocol:            it.Protocol,
+		DownloadID:          it.DownloadID,
 	}
 	if it.Size > 0 {
 		r.Progress = math.Round((it.Size-it.SizeLeft)/it.Size*1000) / 10
@@ -103,6 +114,72 @@ func newQueueRecord(inst config.Instance, it arrapi.QueueItem) queueRecord {
 		r.EpisodeTitle = it.Episode.Title
 	}
 	return r
+}
+
+// postProcessingLookback is how many of the newest History entries are
+// searched for Downloads still being post-processed. SABnzbd lists those
+// first, so they are always among the newest.
+const postProcessingLookback = 100
+
+// fetchSabnzbdQueue gives SABnzbd's Queue: the slots in its queue, in order,
+// then the Downloads in its history it is still post-processing.
+func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi.Client) instanceResult[queueRecord] {
+	q, err := client.Queue(ctx)
+	if err != nil {
+		return instanceResult[queueRecord]{err: err}
+	}
+	history, err := client.History(ctx, postProcessingLookback, false)
+	if err != nil {
+		return instanceResult[queueRecord]{err: err}
+	}
+	base := queueRecord{Instance: inst.Name, App: inst.App, DownloadClient: inst.App.DisplayName(), Protocol: "usenet"}
+	var recs []queueRecord
+	for _, slot := range q.Slots {
+		r := base
+		r.Title, r.Release, r.DownloadID = slot.Filename, slot.Filename, slot.NzoID
+		r.Progress = float64(slot.Percentage)
+		r.Size, r.SizeLeft = slot.Bytes(), slot.BytesLeft()
+		r.TimeLeft = sabnzbdTimeLeft(slot.TimeLeft)
+		r.Status = strings.ToLower(slot.Status)
+		r.Priority, r.Category = strings.ToLower(slot.Priority), slot.Category
+		position := slot.Index + 1
+		r.Position = &position
+		recs = append(recs, r)
+	}
+	for _, h := range history {
+		if h.Finished() {
+			continue
+		}
+		r := base
+		r.Title, r.Release, r.DownloadID = h.Name, h.Name, h.NzoID
+		r.Progress, r.Size = 100, h.Bytes
+		r.Status, r.Category = strings.ToLower(h.Status), h.Category
+		recs = append(recs, r)
+	}
+	return instanceResult[queueRecord]{recs: recs}
+}
+
+// sabnzbdTimeLeft turns SABnzbd's h:mm:ss, or d:hh:mm:ss from a day on, into
+// the .NET TimeSpan the Media Apps give ("00:25:00", "1.02:03:04"), so time
+// left reads the same from every App. It returns "" for no time left and the
+// input when it does not parse.
+func sabnzbdTimeLeft(s string) string {
+	parts := strings.Split(s, ":")
+	n := make([]int, len(parts))
+	for i, p := range parts {
+		v, err := strconv.Atoi(p)
+		if err != nil {
+			return s
+		}
+		n[i] = v
+	}
+	switch len(n) {
+	case 3:
+		return fmt.Sprintf("%02d:%02d:%02d", n[0], n[1], n[2])
+	case 4:
+		return fmt.Sprintf("%d.%02d:%02d:%02d", n[0], n[1], n[2], n[3])
+	}
+	return s
 }
 
 // queueStatus is the download's status, except that a finished download the
@@ -123,10 +200,10 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 	for _, r := range recs {
 		rows = append(rows, []string{
 			r.Instance, r.displayTitle(), r.displayEpisode(), fmt.Sprintf("%.0f%%", math.Floor(r.Progress)),
-			formatTimeLeft(r.TimeLeft), orDash(r.Status), orDash(r.DownloadClient),
+			formatTimeLeft(r.TimeLeft), orDash(r.Status), orDash(r.Priority), orDash(r.Category), orDash(r.DownloadClient),
 		})
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "EPISODE", "PROGRESS", "ETA", "STATUS", "CLIENT"}, rows)
+	return renderTable(w, []string{"INSTANCE", "TITLE", "EPISODE", "PROGRESS", "ETA", "STATUS", "PRIORITY", "CATEGORY", "CLIENT"}, rows)
 }
 
 func (r queueRecord) displayTitle() string { return titleWithYear(r.Title, r.Year) }

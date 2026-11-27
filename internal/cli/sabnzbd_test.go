@@ -216,15 +216,15 @@ func TestSabnzbdInstanceHasNoMediaAppCommands(t *testing.T) {
 	sab := fakeSabnzbd(t)
 	useConfig(t, instanceDef{"sab", "sabnzbd", sab.URL, testAPIKey})
 
-	for _, cmd := range []string{"list", "calendar", "search", "add", "queue"} {
+	for _, cmd := range []string{"list", "calendar", "search", "add"} {
 		_, stderr, code := run(t, "sab", cmd, "x")
 		if code != 1 || !strings.Contains(stderr, "unknown command") {
 			t.Errorf("arr sab %s: exit code %d, stderr %q; want unknown command", cmd, code, stderr)
 		}
 	}
 	got := complete(t, "sab", "")
-	if strings.Join(got, " ") != "status" {
-		t.Errorf("completion for arr sab offers %v, want only status", got)
+	if strings.Join(got, " ") != "queue status" {
+		t.Errorf("completion for arr sab offers %v, want queue and status", got)
 	}
 }
 
@@ -263,5 +263,66 @@ func TestConfigAddWithWrongSabnzbdKeySavesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("config written despite the failure: %v", err)
+	}
+}
+
+func TestQueueOfSabnzbdListsItsDownloadsInOrderIncludingPostProcessing(t *testing.T) {
+	srv := fakeSabnzbd(t)
+	useConfig(t, instanceDef{"sab", "sabnzbd", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sab", "queue")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	for _, want := range []string{
+		"PRIORITY", "CATEGORY",
+		"Severance.S02E07.1080p.WEB-DL-EXAMPLE", "25%", "25m", "downloading", "high", "tv",
+		"Some.Linux.ISO.x64", "0%", "1d 2h 3m", "queued", "normal",
+		"The.Bear.S03E01.1080p.WEB-DL-EXAMPLE", "100%", "extracting",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	assertInOrder(t, out, "Severance.S02E07", "Some.Linux.ISO", "The.Bear.S03E01")
+	for _, finished := range []string{"Dune.Part.Two", "Some.Broken.Upload"} {
+		if strings.Contains(out, finished) {
+			t.Errorf("finished Download %s is not in the Queue:\n%s", finished, out)
+		}
+	}
+}
+
+func TestQueueOfSabnzbdAsJSON(t *testing.T) {
+	srv := fakeSabnzbd(t)
+	useConfig(t, instanceDef{"sab", "sabnzbd", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sab", "queue", "--json")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	var recs []map[string]any
+	if err := json.Unmarshal([]byte(out), &recs); err != nil || len(recs) != 3 {
+		t.Fatalf("want 3 records: %v\n%s", err, out)
+	}
+	first := map[string]any{
+		"instance": "sab", "app": "sabnzbd", "title": "Severance.S02E07.1080p.WEB-DL-EXAMPLE",
+		"release": "Severance.S02E07.1080p.WEB-DL-EXAMPLE", "downloadId": "SABnzbd_nzo_abc123",
+		"progress": float64(25), "size": float64(4000 << 20), "sizeLeft": float64(3000 << 20),
+		"timeLeft": "00:25:00", "status": "downloading", "priority": "high", "category": "tv",
+		"position": float64(1), "downloadClient": "SABnzbd", "protocol": "usenet",
+	}
+	for k, v := range first {
+		if recs[0][k] != v {
+			t.Errorf("first record %q = %v, want %v", k, recs[0][k], v)
+		}
+	}
+	if recs[1]["timeLeft"] != "1.02:03:04" {
+		t.Errorf("a day or more left should read like the Media Apps' 1.02:03:04, got %v", recs[1]["timeLeft"])
+	}
+	pp := recs[2]
+	if _, ok := pp["position"]; ok || pp["status"] != "extracting" || pp["progress"] != float64(100) {
+		t.Errorf("post-processing record should be extracting at 100%% with no position: %v", pp)
 	}
 }

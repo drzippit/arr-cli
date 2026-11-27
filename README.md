@@ -137,7 +137,7 @@ arr radarr-4k status    # just radarr-4k
 | Command | What it does |
 | --- | --- |
 | `arr [<instance>] status` | Whether each Instance is reachable, its version, and how many Warnings it reports. For SABnzbd also whether it is downloading or paused, its speed, and the free space in its download folders. `-v` lists each Warning. |
-| `arr [<instance>] queue` | Downloads in progress in Sonarr and Radarr, with progress and time left. |
+| `arr [<instance>] queue` | Downloads in progress, with progress and time left. `arr queue` covers Sonarr and Radarr; `arr <sabnzbd> queue` shows SABnzbd's own Queue in order, with priority and category, including Downloads it is still verifying, repairing or unpacking. |
 | `arr [<instance>] calendar` | Episodes and Movie releases due this month, as a grid in a wide enough terminal. `--month 2026-12`, `--month next` or `prev` picks another month; `--list` gives a list by date; `--unmonitored` includes unmonitored ones. |
 | `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. `--plain` prints one Title per line. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
@@ -147,7 +147,7 @@ arr radarr-4k status    # just radarr-4k
 | `arr config list` | The Instances in the config, with API keys hidden. |
 | `arr completion <shell>` | A completion script for fish, zsh or bash. |
 
-`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status` for now.
+`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status` and `queue` for now.
 
 Every command takes `--json` to print JSON instead of a table, and `--help` for its flags.
 

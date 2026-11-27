@@ -79,6 +79,9 @@ type QueueItem struct {
 	TrackedDownloadState    string         `json:"trackedDownloadState"`
 	Protocol                string         `json:"protocol"`
 	DownloadClient          string         `json:"downloadClient"`
+	// DownloadID is the Download Client's ID for the download, such as
+	// SABnzbd's nzo_id.
+	DownloadID string `json:"downloadId"`
 }
 
 // SeriesSummary is the Series a Sonarr queue or calendar item belongs to.

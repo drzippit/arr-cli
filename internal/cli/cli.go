@@ -189,8 +189,8 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	}
 	only := func() ([]config.Instance, error) { return []config.Instance{inst}, nil }
 	cmd.AddCommand(newStatusCmd(only, flags))
+	cmd.AddCommand(newQueueCmd(only, flags))
 	if inst.App.Kind() == config.MediaApp {
-		cmd.AddCommand(newQueueCmd(only, flags))
 		cmd.AddCommand(newCalendarCmd(only, flags))
 		cmd.AddCommand(newListCmd(only, flags))
 		cmd.AddCommand(newSearchCmd(inst, flags))
