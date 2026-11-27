@@ -10,7 +10,7 @@
 
 **Run your self-hosted \*arr media stack from the terminal.**
 
-`arr` talks to every Sonarr, Radarr and SABnzbd you run at once. Check that they're all healthy, see what's downloading and what's due this month, search your Libraries, and add new Series and Movies, without opening a single web UI. Every command prints a readable table in a terminal and clean JSON for scripts.
+`arr` talks to every Sonarr, Radarr and SABnzbd you run at once. Check that they're all healthy, watch what's downloading and see what's due this month, search your Libraries, add new Series and Movies, and change or hunt for many of them at once, without opening a single web UI. Every command prints a readable table in a terminal and clean JSON for scripts.
 
 ```
 $ arr status
@@ -25,11 +25,13 @@ $ arr status
 
 ## Features
 
-- **Every Instance at once.** `arr status`, `arr queue`, `arr calendar` and `arr list` ask all your Instances in parallel and show the answers together, including a second Sonarr for 4K or anime.
+- **Every Instance at once.** `arr status`, `arr queue`, `arr calendar`, `arr list` and `arr history` ask all your Instances in parallel and show the answers together, including a second Sonarr for 4K or anime.
+- **Downloads in one place.** `arr queue` shows each Download once, with the Title Sonarr or Radarr grabbed it for and SABnzbd's live progress; `--watch` keeps it on screen. `arr history` shows what SABnzbd finished or failed.
 - **One Instance by name.** `arr sonarr-4k queue` works on just that one, so a command that changes something always names what it changes.
 - **Add Series and Movies.** Search, pick a Candidate, and add it with your usual quality profile and root folder, interactively or fully from a script.
+- **Many Titles at once.** Filter a Library by `--missing`, `--unmonitored`, `--quality` or `--status`, then `edit` their monitoring or quality profile, or `hunt` for Releases of them, with a preview, a picker and a confirm before anything changes.
 - **A month at a glance.** `arr calendar` draws the episodes and Movie releases due this month as a grid in your terminal.
-- **Made for scripts too.** `--json` on every command, `--plain` lists, no prompts when there's no terminal, and a non-zero exit code when an Instance can't be reached.
+- **Made for scripts too.** `--json` on every command, `--plain` lists, IDs on stdin for `edit` and `hunt`, no prompts when there's no terminal, and a non-zero exit code when an Instance can't be reached.
 - **Shell completion** for fish, zsh and bash, including the names of your Instances.
 
 ## Install
@@ -81,7 +83,7 @@ go build -o arr ./cmd/arr
    arr status
    ```
 
-3. **Explore:** `arr queue`, `arr calendar`, `arr list`, and `arr <instance> --help` for what one Instance can do.
+3. **Explore:** `arr queue`, `arr calendar`, `arr list --missing`, and `arr <instance> --help` for what one Instance can do, such as `edit` and `hunt`.
 
 ## Configuration
 
@@ -151,7 +153,7 @@ arr radarr-4k status    # just radarr-4k
 | `arr config list` | The Instances in the config, with API keys hidden. |
 | `arr completion <shell>` | A completion script for fish, zsh or bash. |
 
-`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status`, `queue` and `history`. `history` covers SABnzbd only.
+`calendar`, `list`, `search`, `add`, `edit` and `hunt` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status`, `queue` and `history`. `history` covers SABnzbd only.
 
 Every command takes `--json` to print JSON instead of a table, and `--help` for its flags.
 
@@ -199,7 +201,8 @@ arr sonarr list --json --monitored | jq '[.[] | select(.seasons > 5)]' | arr son
 
 - `--json` prints the same records as the table, for `jq` and friends.
 - `arr list --plain` prints one Title per line.
-- Pickers and prompts only appear when both stdin and stdout are a terminal.
+- Pickers and prompts only appear when both stdin and stdout are a terminal. `edit` and `hunt` then refuse unless you pass `--yes`, or `--dry-run` to see what they would do.
+- `edit -` and `hunt -` read their Titles' IDs from stdin: one per line, or `arr list --json` output.
 - A command across several Instances still shows what the reachable ones said, reports each one that failed on stderr, and exits non-zero. Warnings an Instance reports about itself don't change the exit code.
 
 ```sh
@@ -218,11 +221,11 @@ Completion offers the top-level commands and your Instance names (`arr ra<TAB>`)
 
 ## Supported App versions
 
-`arr` supports **Sonarr 4 and later** and **Radarr 5 and later**, the current major versions, and **SABnzbd 4 and later**: `arr` only reads from SABnzbd, and versions 4 and 5 answer it alike. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
+`arr` supports **Sonarr 4 and later** and **Radarr 5 and later**, the current major versions, and **SABnzbd 4 and later**: `arr` only reads from SABnzbd, and versions 4 and 5 answer it alike. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, `edit` and `hunt`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
 
 ## Versioning
 
-`arr --version` prints the arr version you are running (`arr v0.3.0`), or `dev` and the commit for a build that is not one (`arr dev (52b07aa-dirty)`). Add `--json` for `{"version", "commit", "dirty"}`. It works even when the config does not load.
+`arr --version` prints the arr version you are running (`arr v0.4.0`), or `dev` and the commit for a build that is not one (`arr dev (52b07aa-dirty)`). Add `--json` for `{"version", "commit", "dirty"}`. It works even when the config does not load.
 
 arr versions follow [SemVer](https://semver.org) over what scripts use: commands and flags, `--json` output, the config file and exit codes. Removing or renaming a JSON field is a breaking change; adding one is not. Tables and other output meant for people can change in any arr version. While `arr` is on `0.x`, a minor arr version may break things. See [ADR 0004](docs/adr/0004-semver-over-the-scripting-surface.md).
 
