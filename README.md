@@ -1,7 +1,7 @@
 # arr-cli
 
 [![Release](https://github.com/drzippit/arr-cli/actions/workflows/release.yml/badge.svg)](https://github.com/drzippit/arr-cli/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/badge/release-v0.2.0-blue)](https://github.com/drzippit/arr-cli/releases/latest)
+[![Latest release](https://img.shields.io/badge/release-v0.2.1-blue)](https://github.com/drzippit/arr-cli/releases/latest)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Sonarr](https://img.shields.io/badge/Sonarr-4%2B-35c5f4)](docs/adr/0003-current-major-app-versions-only.md)
 [![Radarr](https://img.shields.io/badge/Radarr-5%2B-ffc230)](docs/adr/0003-current-major-app-versions-only.md)
@@ -37,7 +37,7 @@ $ arr status
 Each [release](https://github.com/drzippit/arr-cli/releases) has an archive per platform (Linux and macOS on amd64/arm64, Windows on amd64) and a `SHA256SUMS`. Set `v` to the latest release and pick your platform:
 
 ```sh
-v=v0.2.0 platform=linux_amd64
+v=v0.2.1 platform=linux_amd64
 curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/arr_${v}_${platform}.tar.gz"
 curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS   # on macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
