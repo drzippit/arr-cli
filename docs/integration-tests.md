@@ -39,4 +39,12 @@ func TestIntegrationQueueOfSonarr(t *testing.T) {
 }
 ```
 
-Check what a real Instance must give, not what this particular run happens to hold: a new Instance has nothing downloading, so a queue test can only expect an empty queue unless it adds something first.
+Check what a real Instance must give, not what this particular run happens to hold: a new Instance has nothing downloading, so a queue test can only expect an empty queue unless it adds something first. Another test may already have added a Title, so a read-only test checks the shape of the output, not that it is empty.
+
+Helpers in `integration_test.go`:
+
+- `records(t, args...)` runs arr with `--json` among `args` and returns its records, failing unless the output is a JSON list whose records each name their Instance and App.
+- `useBothInstances(t)` puts both real Instances in the config, for commands that run across every Instance.
+- `ensureRootFolder(t, inst, "/movies")` makes a folder a root folder of the Instance unless it already is; `add` needs one.
+
+A test that changes an Instance keeps every step that depends on that change in one test, in order: `TestIntegrationAddThenListMovie` adds The Matrix, lists it, and checks a second add is refused. The `search` and `add` tests go through the App to its metadata service, so they need the internet and fail while that service is down; re-run the Release once it is back.
