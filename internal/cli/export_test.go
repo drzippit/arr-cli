@@ -54,3 +54,11 @@ func SetWatchFrames(t testing.TB, frames int) {
 	watchWait = func(context.Context, time.Duration) bool { return true }
 	t.Cleanup(func() { watchFrames, watchWait = prevFrames, prevWait })
 }
+
+// SetConfirm makes the CLI act as if it runs in a terminal, calling confirm
+// whenever it would ask a yes/no question, until t ends.
+func SetConfirm(t testing.TB, confirm func(question string) (bool, error)) {
+	prev := newConfirmer
+	newConfirmer = func(io.Reader, io.Writer) confirmer { return confirm }
+	t.Cleanup(func() { newConfirmer = prev })
+}

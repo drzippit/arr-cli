@@ -534,3 +534,47 @@ func TestIntegrationListFiltersOfSonarr(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegrationEditChangesMonitoringAndQuality(t *testing.T) {
+	cases := []struct {
+		app, root, key, flag string
+		id                   int
+		addArgs              []string
+	}{
+		{"radarr", "/movies", "tmdbId", "--tmdb", 348, nil},                        // Alien
+		{"sonarr", "/tv", "tvdbId", "--tvdb", 78874, []string{"--monitor", "all"}}, // Firefly
+	}
+	for _, c := range cases {
+		t.Run(c.app, func(t *testing.T) {
+			inst := realInstanceFor(t, c.app)
+			useConfig(t, inst)
+			ensureRootFolder(t, inst, c.root)
+			add := append([]string{c.app, "add", c.flag, fmt.Sprint(c.id), "--quality", "HD-1080p", "--root", c.root, "--no-search"}, c.addArgs...)
+			if out, stderr, code := run(t, add...); code != 0 {
+				t.Fatalf("add: exit code %d, stderr: %s\n%s", code, stderr, out)
+			}
+			var added map[string]any
+			for _, r := range records(t, c.app, "list", "--json") {
+				if r[c.key] == float64(c.id) {
+					added = r
+				}
+			}
+			if added == nil {
+				t.Fatalf("added Title not listed")
+			}
+			query := added["title"].(string)
+
+			out, stderr, code := run(t, c.app, "edit", query, "--set-monitored=false", "--set-quality", "Any", "--yes")
+			if code != 0 {
+				t.Fatalf("edit: exit code %d, stderr: %s\n%s", code, stderr, out)
+			}
+
+			for _, r := range records(t, c.app, "list", "--json", "--unmonitored", "--quality", "Any") {
+				if r[c.key] == float64(c.id) {
+					return
+				}
+			}
+			t.Errorf("after edit, list --unmonitored --quality Any should show %s", query)
+		})
+	}
+}

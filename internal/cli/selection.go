@@ -94,11 +94,11 @@ func (f titleFilter) checkQuality(libs []library) error {
 		}
 		fetched = true
 		for _, p := range l.profiles {
-			if strings.EqualFold(p, f.quality) {
+			if strings.EqualFold(p.Name, f.quality) {
 				return nil
 			}
-			if !slices.Contains(known, p) {
-				known = append(known, p)
+			if !slices.Contains(known, p.Name) {
+				known = append(known, p.Name)
 			}
 		}
 	}
@@ -106,4 +106,9 @@ func (f titleFilter) checkQuality(libs []library) error {
 		return nil
 	}
 	return fmt.Errorf("--quality %q is not a quality profile; there are %s", f.quality, strings.Join(known, ", "))
+}
+
+// any reports whether any filter is set.
+func (f titleFilter) any() bool {
+	return f.monitored || f.unmonitored || f.missing || f.status != "" || f.quality != ""
 }
