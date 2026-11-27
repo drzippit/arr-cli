@@ -34,21 +34,29 @@ $ arr status
 
 ### From a release
 
-Download the archive for your platform from the [latest release](https://github.com/drzippit/arr-cli/releases/latest) (Linux and macOS on amd64/arm64, Windows on amd64), check it against `SHA256SUMS`, and put `arr` on your `PATH`. While the repository is private, download with the GitHub CLI:
+Each [release](https://github.com/drzippit/arr-cli/releases) has an archive per platform (Linux and macOS on amd64/arm64, Windows on amd64) and a `SHA256SUMS`. Set `v` to the latest release and pick your platform:
 
 ```sh
-gh release download --repo drzippit/arr-cli --pattern 'arr_*_linux_amd64.tar.gz' --pattern SHA256SUMS
-sha256sum --check --ignore-missing SHA256SUMS
-tar -xzf arr_*_linux_amd64.tar.gz arr
+v=v0.1.0 platform=linux_amd64
+curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/arr_${v}_${platform}.tar.gz"
+curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS   # on macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
+tar -xzf "arr_${v}_${platform}.tar.gz" arr
 sudo install arr /usr/local/bin/
+```
+
+### With Go
+
+With Go 1.27 or later, this installs the latest Release:
+
+```sh
+go install github.com/drzippit/arr-cli/cmd/arr@latest
 ```
 
 ### From source
 
-With Go 1.27 or later:
-
 ```sh
-git clone git@github.com:drzippit/arr-cli.git
+git clone https://github.com/drzippit/arr-cli.git
 cd arr-cli
 go build -o arr ./cmd/arr
 ```
@@ -187,4 +195,5 @@ make dist VERSION=dev  # the release archives, into dist/
 - `main` takes changes only through PRs from `feat/`, `fix/` or `chore/` branches. Run `make hooks` once after cloning to turn on the git hooks that enforce it; see [docs/agents/branching.md](docs/agents/branching.md).
 - `make integration` needs Docker with Compose; see [docs/integration-tests.md](docs/integration-tests.md).
 - Pushing a `v*` tag on `main` (for example `v0.2.0`) builds and publishes a release through [the Release workflow](.github/workflows/release.yml). A tag with a hyphen (`v0.2.0-rc1`) becomes a pre-release, and a tag that is not SemVer fails the workflow.
+- `arr` is released under the [MIT License](LICENSE).
 - The domain language (App, Instance, Title, Library, Candidate, Warning…) is defined in [GLOSSARY.md](GLOSSARY.md), and design decisions are recorded in [docs/adr](docs/adr).
