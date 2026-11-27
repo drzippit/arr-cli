@@ -36,10 +36,11 @@ $ arr status
 
 ### From a release
 
-Each [release](https://github.com/drzippit/arr-cli/releases) has an archive per platform (Linux and macOS on amd64/arm64, Windows on amd64) and a `SHA256SUMS`. Set `v` to the latest release and pick your platform:
+Each [release](https://github.com/drzippit/arr-cli/releases) has an archive per platform (Linux and macOS on amd64/arm64, Windows on amd64) and a `SHA256SUMS`. Pick your platform; `v` becomes the latest release (or set it yourself, as in `v=v0.3.0`):
 
 ```sh
-v=v0.3.0 platform=linux_amd64
+platform=linux_amd64
+v=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/drzippit/arr-cli/releases/latest); v=${v##*/}
 curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/arr_${v}_${platform}.tar.gz"
 curl -fsSLO "https://github.com/drzippit/arr-cli/releases/download/$v/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS   # on macOS: shasum -a 256 --check --ignore-missing SHA256SUMS
