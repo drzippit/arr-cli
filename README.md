@@ -181,7 +181,7 @@ arr radarr hunt --missing                          # look for Releases of every 
 
 Both `edit` and `hunt` guard against changing more than you meant to (see [ADR 0006](docs/adr/0006-bulk-commands-guard-their-selection.md)):
 
-- In a terminal they say what they will do and ask first. From a script they refuse unless you pass `--yes`, or `--dry-run`, which shows the plan and changes nothing.
+- In a terminal they first list the Titles they matched, all ticked, so you can untick any to leave out, then say what they will do and ask. From a script they refuse unless you pass `--yes`, or `--dry-run`, which shows the plan and changes nothing.
 - With no query and no filter they would act on the whole Library, so you have to pass `--all` for that.
 - They work on one named Instance at a time, and refuse a Sonarr or Radarr older than arr supports.
 

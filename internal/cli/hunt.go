@@ -58,6 +58,17 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				fmt.Fprintln(stderr, "arr: dry run; nothing hunted")
 				return nil
 			}
+			if sel, err = guard.pick(cmd, sel, "Which to hunt? All are ticked; untick any to leave out"); err != nil {
+				return err
+			}
+			if len(sel) == 0 {
+				fmt.Fprintln(stderr, "arr: nothing picked; nothing hunted")
+				return renderHunts(w, nil, flags.json)
+			}
+			recs = make([]huntRecord, len(sel))
+			for i, r := range sel {
+				recs[i] = huntRecord{libraryRecord: r}
+			}
 			question := fmt.Sprintf("Hunt for Releases of %s in %s?", countTitles(inst.App, len(sel)), inst.Name)
 			if err := guard.confirm(cmd, question, len(sel)); err != nil {
 				return err

@@ -85,6 +85,14 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				fmt.Fprintln(stderr, "arr: dry run; nothing changed")
 				return nil
 			}
+			if titles, err = guard.pick(cmd, titles, "Which to change? All are ticked; untick any to leave out"); err != nil {
+				return err
+			}
+			if len(titles) == 0 {
+				fmt.Fprintln(stderr, "arr: nothing picked; nothing changed")
+				return renderEdits(w, nil, flags.json)
+			}
+			recs = plannedEdits(titles, edit, quality)
 			question := fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, len(titles)), inst.Name, describeEdit(edit, quality))
 			if err := guard.confirm(cmd, question, len(titles)); err != nil {
 				return err
@@ -147,6 +155,31 @@ func (g selectionGuard) confirm(cmd *cobra.Command, question string, n int) erro
 		return errCancelled
 	}
 	return nil
+}
+
+// pick lets the person at the terminal untick Titles of sel before anything
+// happens. With --yes or --dry-run, or without a terminal, sel stays whole.
+func (g selectionGuard) pick(cmd *cobra.Command, sel []libraryRecord, title string) ([]libraryRecord, error) {
+	if g.yes || g.dryRun {
+		return sel, nil
+	}
+	choose := newPicker(cmd.InOrStdin(), cmd.OutOrStdout())
+	if choose == nil {
+		return sel, nil
+	}
+	options := make([]string, len(sel))
+	for i, r := range sel {
+		options[i] = r.displayTitle()
+	}
+	picked, err := choose(title, options)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]libraryRecord, 0, len(picked))
+	for _, i := range picked {
+		out = append(out, sel[i])
+	}
+	return out, nil
 }
 
 // selectTitles is the Selection: the Titles matching query and filter.
