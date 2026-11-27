@@ -43,7 +43,50 @@ type Queue struct {
 	// Downloads are fetched into and of the one they end up in.
 	DiskSpace1 number `json:"diskspace1"`
 	DiskSpace2 number `json:"diskspace2"`
+	// Slots are the Downloads waiting or being fetched, in queue order.
+	Slots []QueueSlot `json:"slots"`
 }
+
+// QueueSlot is one Download in SABnzbd's queue.
+type QueueSlot struct {
+	Index    int    `json:"index"`
+	NzoID    string `json:"nzo_id"`
+	Filename string `json:"filename"`
+	Category string `json:"cat"`
+	// Priority is Force, High, Normal, Low or Stop.
+	Priority string `json:"priority"`
+	// MB and MBLeft are sizes in MiB.
+	MB         number `json:"mb"`
+	MBLeft     number `json:"mbleft"`
+	Percentage number `json:"percentage"`
+	// Status is Queued, Paused, Downloading, Fetching, Grabbing, Checking
+	// or Propagating.
+	Status string `json:"status"`
+	// TimeLeft is h:mm:ss, or d:hh:mm:ss from a day on.
+	TimeLeft string `json:"timeleft"`
+}
+
+// Bytes and BytesLeft are the slot's size and what is still to fetch.
+func (s QueueSlot) Bytes() int64     { return int64(float64(s.MB) * (1 << 20)) }
+func (s QueueSlot) BytesLeft() int64 { return int64(float64(s.MBLeft) * (1 << 20)) }
+
+// HistorySlot is one Download in SABnzbd's history. A Download being
+// post-processed is in the history already, with a Status such as
+// Extracting.
+type HistorySlot struct {
+	NzoID       string `json:"nzo_id"`
+	Name        string `json:"name"`
+	Category    string `json:"category"`
+	Status      string `json:"status"`
+	Bytes       int64  `json:"bytes"`
+	Completed   int64  `json:"completed"`
+	FailMessage string `json:"fail_message"`
+	ActionLine  string `json:"action_line"`
+}
+
+// Finished reports whether SABnzbd is done with the Download, whether it
+// completed or failed.
+func (h HistorySlot) Finished() bool { return h.Status == "Completed" || h.Status == "Failed" }
 
 // SpeedBytes is the current speed in bytes per second.
 func (q Queue) SpeedBytes() int64 { return int64(float64(q.KBPerSec) * 1024) }
@@ -69,6 +112,23 @@ func (c *Client) Queue(ctx context.Context) (Queue, error) {
 	}
 	err := c.get(ctx, "queue", nil, &resp)
 	return resp.Queue, err
+}
+
+// History fetches the newest limit Downloads in SABnzbd's history, newest
+// first, including those still being post-processed. failedOnly keeps only
+// the failed ones.
+func (c *Client) History(ctx context.Context, limit int, failedOnly bool) ([]HistorySlot, error) {
+	q := url.Values{"limit": {strconv.Itoa(limit)}}
+	if failedOnly {
+		q.Set("failed_only", "1")
+	}
+	var resp struct {
+		History struct {
+			Slots []HistorySlot `json:"slots"`
+		} `json:"history"`
+	}
+	err := c.get(ctx, "history", q, &resp)
+	return resp.History.Slots, err
 }
 
 // Warnings fetches the warnings SABnzbd currently shows.

@@ -109,7 +109,8 @@ func TestQueueJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "estimatedCompletionTime": "2026-11-26T14:12:34Z",
     "status": "downloading",
     "downloadClient": "SABnzbd",
-    "protocol": "usenet"
+    "protocol": "usenet",
+    "downloadId": "SABnzbd_nzo_abc123"
   },
   {
     "instance": "sonarr",
@@ -124,7 +125,8 @@ func TestQueueJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "sizeLeft": 4294967296,
     "status": "queued",
     "downloadClient": "qBittorrent",
-    "protocol": "torrent"
+    "protocol": "torrent",
+    "downloadId": "A1B2C3D4E5F6"
   },
   {
     "instance": "radarr-4k",
@@ -139,7 +141,8 @@ func TestQueueJSONIsFlatArrayWithInstanceAndApp(t *testing.T) {
     "estimatedCompletionTime": "2026-11-27T16:03:04Z",
     "status": "warning",
     "downloadClient": "qBittorrent",
-    "protocol": "torrent"
+    "protocol": "torrent",
+    "downloadId": "F6E5D4C3B2A1"
   }
 ]
 `

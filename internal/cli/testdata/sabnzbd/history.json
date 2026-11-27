@@ -1,0 +1,162 @@
+{
+  "history": {
+    "total_size": "114",
+    "month_size": "114",
+    "week_size": "114",
+    "day_size": "114",
+    "slots": [
+      {
+        "completed": 0,
+        "name": "The.Bear.S03E01.1080p.WEB-DL-EXAMPLE",
+        "nzb_name": "The.Bear.S03E01.1080p.WEB-DL-EXAMPLE.nzb",
+        "category": "tv",
+        "pp": "D",
+        "script": "None",
+        "report": "",
+        "url": null,
+        "status": "Extracting",
+        "nzo_id": "SABnzbd_nzo_pp789",
+        "storage": "/config/Downloads/incomplete/The.Bear.S03E01.1080p.WEB-DL-EXAMPLE",
+        "path": "/config/Downloads/incomplete/The.Bear.S03E01.1080p.WEB-DL-EXAMPLE",
+        "script_line": "",
+        "download_time": 600,
+        "postproc_time": 0,
+        "stage_log": [
+          {
+            "name": "Source",
+            "actions": [
+              "The.Bear.S03E01.1080p.WEB-DL-EXAMPLE.nzb"
+            ]
+          },
+          {
+            "name": "Download",
+            "actions": [
+              "Downloaded in 10 minutes at an average of 3.4 MB/s"
+            ]
+          }
+        ],
+        "downloaded": 2147483648,
+        "completeness": null,
+        "fail_message": "",
+        "url_info": "",
+        "bytes": 2147483648,
+        "meta": null,
+        "series": null,
+        "md5sum": "07bf8619990270e14b5d868a765f46be",
+        "password": null,
+        "duplicate_key": "the bear/3/1",
+        "archive": false,
+        "time_added": 1795776735,
+        "size": "2.0 GB",
+        "action_line": "Unpacking: 3/10",
+        "loaded": false,
+        "retry": false
+      },
+      {
+        "completed": 1795770000,
+        "name": "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE",
+        "nzb_name": "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE.nzb",
+        "category": "movies",
+        "pp": "D",
+        "script": "None",
+        "report": "",
+        "url": null,
+        "status": "Completed",
+        "nzo_id": "SABnzbd_nzo_done111",
+        "storage": "/downloads/complete/movies/Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE",
+        "path": "/downloads/complete/movies/Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE",
+        "script_line": "",
+        "download_time": 3600,
+        "postproc_time": 120,
+        "stage_log": [
+          {
+            "name": "Source",
+            "actions": [
+              "Dune.Part.Two.2024.2160p.WEB-DL-EXAMPLE.nzb"
+            ]
+          },
+          {
+            "name": "Download",
+            "actions": [
+              "Downloaded in 1 hour at an average of 5.1 MB/s"
+            ]
+          },
+          {
+            "name": "Unpack",
+            "actions": [
+              "Unpacked 1 files/folders in 2 minutes"
+            ]
+          }
+        ],
+        "downloaded": 19327352832,
+        "completeness": null,
+        "fail_message": "",
+        "url_info": "",
+        "bytes": 19327352832,
+        "meta": null,
+        "series": null,
+        "md5sum": "07bf8619990270e14b5d868a765f46be",
+        "password": null,
+        "duplicate_key": "dune part two",
+        "archive": false,
+        "time_added": 1795776735,
+        "size": "18.0 GB",
+        "action_line": "",
+        "loaded": false,
+        "retry": false
+      },
+      {
+        "completed": 1795760000,
+        "name": "Some.Broken.Upload.x264-NOGRP",
+        "nzb_name": "Some.Broken.Upload.x264-NOGRP.nzb",
+        "category": "*",
+        "pp": "D",
+        "script": "None",
+        "report": "",
+        "url": null,
+        "status": "Failed",
+        "nzo_id": "SABnzbd_nzo_fail222",
+        "storage": "/config/Downloads/incomplete/Severance.S02E07.1080p.WEB.h264-GRP",
+        "path": "/config/Downloads/incomplete/Severance.S02E07.1080p.WEB.h264-GRP",
+        "script_line": "",
+        "download_time": 0,
+        "postproc_time": 0,
+        "stage_log": [
+          {
+            "name": "Source",
+            "actions": [
+              "Some.Broken.Upload.x264-NOGRP.nzb"
+            ]
+          },
+          {
+            "name": "Download",
+            "actions": [
+              "2 articles were missing",
+              "Download failed - Not on your server(s) - https://sabnzbd.org/not-complete"
+            ]
+          }
+        ],
+        "downloaded": 0,
+        "completeness": null,
+        "fail_message": "Download failed - Not on your server(s) - https://sabnzbd.org/not-complete",
+        "url_info": "",
+        "bytes": 0,
+        "meta": null,
+        "series": null,
+        "md5sum": "07bf8619990270e14b5d868a765f46be",
+        "password": null,
+        "duplicate_key": "some broken upload",
+        "archive": false,
+        "time_added": 1795776735,
+        "size": "0 B",
+        "action_line": "",
+        "loaded": false,
+        "retry": true
+      }
+    ],
+    "ppslots": 1,
+    "noofslots": 3,
+    "last_history_update": 7,
+    "version": "5.1.3"
+  }
+}

@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -342,5 +343,57 @@ func TestIntegrationConfigAddRefusesSonarrAsRadarr(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Errorf("nothing should be saved, but %s exists (%v)", filepath.Base(path), err)
+	}
+}
+
+// addNZB uploads testdata/sabnzbd/example.nzb to the SABnzbd Instance under
+// name, with the given SABnzbd priority (-2 adds it paused), and returns its
+// nzo_id.
+func addNZB(t *testing.T, inst instanceDef, name string, priority int) string {
+	t.Helper()
+	nzb, err := os.ReadFile(filepath.Join("testdata", "sabnzbd", "example.nzb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	part, err := form.CreateFormFile("name", name+".nzb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	part.Write(nzb)
+	form.Close()
+	u := fmt.Sprintf("%s/api?mode=addfile&output=json&apikey=%s&priority=%d", inst.url, inst.key, priority)
+	resp, err := http.Post(u, form.FormDataContentType(), &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var added struct {
+		Status bool     `json:"status"`
+		NzoIDs []string `json:"nzo_ids"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&added); err != nil || !added.Status || len(added.NzoIDs) != 1 {
+		t.Fatalf("adding %s to %s: %v %+v", name, inst.name, err, added)
+	}
+	return added.NzoIDs[0]
+}
+
+func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, sab)
+	id := addNZB(t, sab, "Arr.Cli.Queue.Test", -2)
+
+	var found map[string]any
+	for _, r := range records(t, "sabnzbd", "queue", "--json") {
+		if r["downloadId"] == id {
+			found = r
+		}
+	}
+	if found == nil {
+		t.Fatalf("Download %s not in the queue", id)
+	}
+	if found["release"] != "Arr.Cli.Queue.Test" || found["title"] != nil || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
+		t.Errorf("want the paused Download with its position and size, got %v", found)
 	}
 }
