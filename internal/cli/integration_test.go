@@ -149,7 +149,6 @@ func ensureRootFolder(t *testing.T, inst instanceDef, path string) {
 func TestIntegrationQueueAcrossBothApps(t *testing.T) {
 	useBothInstances(t)
 	records(t, "queue", "--json")
-	t.Error("deliberate failure: proves the queue test runs")
 }
 
 func TestIntegrationCalendarAcrossBothApps(t *testing.T) {
@@ -175,7 +174,7 @@ func TestIntegrationSearchRadarr(t *testing.T) {
 
 	recs := records(t, "radarr", "search", "the matrix", "--json")
 
-	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tmdbId"] == float64(604) }) {
+	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tmdbId"] == float64(603) }) {
 		t.Errorf("want a Candidate with TMDB ID 603 (The Matrix), got %v", recs)
 	}
 }
@@ -185,7 +184,7 @@ func TestIntegrationSearchSonarr(t *testing.T) {
 
 	recs := records(t, "sonarr", "search", "breaking bad", "--json")
 
-	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tvdbId"] == float64(81190) }) {
+	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tvdbId"] == float64(81189) }) {
 		t.Errorf("want a Candidate with TVDB ID 81189 (Breaking Bad), got %v", recs)
 	}
 }
@@ -207,12 +206,12 @@ func TestIntegrationAddThenListMovie(t *testing.T) {
 		Title  string `json:"title"`
 		TmdbID int    `json:"tmdbId"`
 	}
-	if err := json.Unmarshal([]byte(out), &added); err != nil || added.ID == 0 || added.TmdbID != 604 {
+	if err := json.Unmarshal([]byte(out), &added); err != nil || added.ID == 0 || added.TmdbID != 603 {
 		t.Fatalf("add --json should describe the added Movie, got %+v (%v):\n%s", added, err, out)
 	}
 
 	recs := records(t, "radarr", "list", "matrix", "--json")
-	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tmdbId"] == float64(604) }) {
+	if !slices.ContainsFunc(recs, func(r map[string]any) bool { return r["tmdbId"] == float64(603) }) {
 		t.Errorf("list should show the added Movie, got %v", recs)
 	}
 
@@ -278,7 +277,7 @@ func TestIntegrationConfigAddRefusesSonarrAsRadarr(t *testing.T) {
 
 	_, stderr, code := run(t, "config", "add")
 
-	if code == 0 || !strings.Contains(stderr, "runs Radarr, not Sonarr") {
+	if code == 0 || !strings.Contains(stderr, "runs Sonarr, not Radarr") {
 		t.Errorf("want a refusal saying it runs Sonarr, not Radarr, got exit %d, stderr %q", code, stderr)
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
