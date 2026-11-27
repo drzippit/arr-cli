@@ -17,3 +17,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 ### Integration tests
 
 A command that calls an App gets a `TestIntegration…` case when it is added or changed; `make integration` runs them against real Instances in Docker. See `docs/integration-tests.md`.
+
+### Branches and PRs
+
+`main` takes changes only through squash-merged PRs from `feat/<feature>`, `fix/<fix>` or `chore/<chore>` branches, and git hooks enforce it. Merge a PR only when the user asks. See `docs/agents/branching.md`.

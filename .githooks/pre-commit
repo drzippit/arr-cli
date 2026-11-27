@@ -1,0 +1,7 @@
+#!/bin/sh
+# Refuses a commit on main: work happens on a feat/, fix/ or chore/ branch
+# and reaches main through a PR (docs/agents/branching.md).
+if [ "$(git symbolic-ref --quiet --short HEAD)" = main ]; then
+	echo "pre-commit: main takes changes only through PRs; branch first, as in git switch -c feat/<feature>" >&2
+	exit 1
+fi

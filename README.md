@@ -184,6 +184,7 @@ make integration       # against real Sonarr and Radarr in Docker
 make dist VERSION=dev  # the release archives, into dist/
 ```
 
+- `main` takes changes only through PRs from `feat/`, `fix/` or `chore/` branches. Run `make hooks` once after cloning to turn on the git hooks that enforce it; see [docs/agents/branching.md](docs/agents/branching.md).
 - `make integration` needs Docker with Compose; see [docs/integration-tests.md](docs/integration-tests.md).
-- Pushing a `v*` tag (for example `v0.2.0`) builds and publishes a release through [the Release workflow](.github/workflows/release.yml). A tag with a hyphen (`v0.2.0-rc1`) becomes a pre-release, and a tag that is not SemVer fails the workflow.
+- Pushing a `v*` tag on `main` (for example `v0.2.0`) builds and publishes a release through [the Release workflow](.github/workflows/release.yml). A tag with a hyphen (`v0.2.0-rc1`) becomes a pre-release, and a tag that is not SemVer fails the workflow.
 - The domain language (App, Instance, Title, Library, Candidate, Warning…) is defined in [GLOSSARY.md](GLOSSARY.md), and design decisions are recorded in [docs/adr](docs/adr).

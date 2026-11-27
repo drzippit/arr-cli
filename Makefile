@@ -1,7 +1,12 @@
-# `make dist` builds the release archives; .github/workflows/release.yml runs
-# it for each v* tag. `make integration` runs arr against real Sonarr and
+# `make hooks` turns on the git hooks in .githooks for this clone; see
+# docs/agents/branching.md. `make dist` builds the release archives;
+# .github/workflows/release.yml runs it for each v* tag. `make integration` runs arr against real Sonarr and
 # Radarr in Docker; see docs/integration-tests.md. A plain `go test ./...`
 # never runs those.
+
+.PHONY: hooks
+hooks:
+	git config core.hooksPath .githooks
 
 ARR_IT_SONARR_PORT ?= 18989
 ARR_IT_RADARR_PORT ?= 17878
