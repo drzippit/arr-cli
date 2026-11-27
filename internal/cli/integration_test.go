@@ -300,6 +300,37 @@ func TestIntegrationConfigAddSavesSonarr(t *testing.T) {
 	}
 }
 
+func TestIntegrationConfigAddSavesSabnzbdAndRefusesAWrongKey(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	path := useMissingConfig(t)
+	fillForm(t, config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: "wrong"})
+
+	_, stderr, code := run(t, "config", "add")
+
+	if code != 1 || !strings.Contains(stderr, "check the API key") {
+		t.Errorf("a wrong key: exit code %d, stderr %q", code, stderr)
+	}
+
+	want := config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: sab.key}
+	fillForm(t, want)
+
+	out, stderr, code := run(t, "config", "add")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	if !strings.Contains(out, "Added sabnzbd (SABnzbd 5.1.") {
+		t.Errorf("want the App and version named:\n%s", out)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config after add: %v", err)
+	}
+	if len(cfg.Instances) != 1 || cfg.Instances[0] != want {
+		t.Errorf("Instances %+v, want %+v", cfg.Instances, want)
+	}
+}
+
 func TestIntegrationConfigAddRefusesSonarrAsRadarr(t *testing.T) {
 	sonarr := realInstanceFor(t, "sonarr")
 	path := useMissingConfig(t)
@@ -362,7 +393,27 @@ func TestIntegrationQueueOfSabnzbdShowsAnAddedDownload(t *testing.T) {
 	if found == nil {
 		t.Fatalf("Download %s not in the queue", id)
 	}
-	if found["title"] != "Arr.Cli.Queue.Test" || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
+	if found["release"] != "Arr.Cli.Queue.Test" || found["title"] != nil || found["status"] != "paused" || found["position"] == nil || found["size"].(float64) <= 0 {
 		t.Errorf("want the paused Download with its position and size, got %v", found)
+	}
+}
+
+func TestIntegrationQueueAcrossMediaAppsAndSabnzbdShowsAHandAddedDownloadOnce(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	useConfig(t, realInstanceFor(t, "sonarr"), realInstanceFor(t, "radarr"), sab)
+	id := addNZB(t, sab, "Arr.Cli.Joined.Queue.Test", -2)
+
+	var found []map[string]any
+	for _, r := range records(t, "queue", "--json") {
+		if r["downloadId"] == id {
+			found = append(found, r)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("want Download %s once, got %d rows", id, len(found))
+	}
+	r := found[0]
+	if r["instance"] != "sabnzbd" || r["release"] != "Arr.Cli.Joined.Queue.Test" || r["title"] != nil {
+		t.Errorf("want SABnzbd's own row, by its release and with no Title: %v", r)
 	}
 }

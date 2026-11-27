@@ -276,8 +276,8 @@ func TestQueueOfSabnzbdListsItsDownloadsInOrderIncludingPostProcessing(t *testin
 		t.Fatalf("exit code %d, stderr: %s", code, stderr)
 	}
 	for _, want := range []string{
-		"PRIORITY", "CATEGORY",
-		"Severance.S02E07.1080p.WEB-DL-EXAMPLE", "40%", "25m", "downloading", "high", "tv",
+		"PRIORITY", "CATEGORY", "SIZE", "LEFT",
+		"Severance.S02E07.1080p.WEB-DL-EXAMPLE", "40%", "3.9 GiB", "2.3 GiB", "25m", "downloading", "high", "tv",
 		"Some.Linux.ISO.x64", "0%", "1d 2h 3m", "queued", "normal",
 		"The.Bear.S03E01.1080p.WEB-DL-EXAMPLE", "100%", "extracting",
 	} {
@@ -307,7 +307,7 @@ func TestQueueOfSabnzbdAsJSON(t *testing.T) {
 		t.Fatalf("want 3 records: %v\n%s", err, out)
 	}
 	first := map[string]any{
-		"instance": "sab", "app": "sabnzbd", "title": "Severance.S02E07.1080p.WEB-DL-EXAMPLE",
+		"instance": "sab", "app": "sabnzbd",
 		"release": "Severance.S02E07.1080p.WEB-DL-EXAMPLE", "downloadId": "SABnzbd_nzo_abc123",
 		"progress": float64(40), "size": float64(4000 << 20), "sizeLeft": float64(2400 << 20),
 		"timeLeft": "00:25:00", "status": "downloading", "priority": "high", "category": "tv",
@@ -318,11 +318,32 @@ func TestQueueOfSabnzbdAsJSON(t *testing.T) {
 			t.Errorf("first record %q = %v, want %v", k, recs[0][k], v)
 		}
 	}
+	for _, r := range recs {
+		if _, ok := r["title"]; ok {
+			t.Errorf("a Download Client's own row is no Title, so it should have none: %v", r)
+		}
+	}
 	if recs[1]["timeLeft"] != "1.02:03:04" {
 		t.Errorf("a day or more left should read like the Media Apps' 1.02:03:04, got %v", recs[1]["timeLeft"])
 	}
 	pp := recs[2]
 	if _, ok := pp["position"]; ok || pp["status"] != "extracting" || pp["progress"] != float64(100) {
 		t.Errorf("post-processing record should be extracting at 100%% with no position: %v", pp)
+	}
+}
+
+func TestQueueOfMediaAppHasNoDownloadClientColumns(t *testing.T) {
+	srv := fakeInstance(t, "sonarr")
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sonarr", "queue")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	for _, unwanted := range []string{"PRIORITY", "CATEGORY", "SIZE", "LEFT"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("a Media App's queue should look as it did, without %s:\n%s", unwanted, out)
+		}
 	}
 }
