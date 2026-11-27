@@ -187,6 +187,57 @@ func (c *Client) post(ctx context.Context, path string, body, into any) error {
 	return &StatusError{Method: http.MethodPost, Path: path, Code: resp.StatusCode}
 }
 
+// put sends body as JSON to path and expects 200 OK or 202 Accepted, the
+// answers of the Apps' bulk editors. When the App rejects the body, the error
+// gives the App's own reasons.
+func (c *Client) put(ctx context.Context, path string, body any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	resp, err := c.do(ctx, http.MethodPut, path, nil, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return err
+	}
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusAccepted:
+		return nil
+	case http.StatusBadRequest:
+		if reasons := validationErrors(respBody); len(reasons) > 0 {
+			return fmt.Errorf("PUT %s: %s", endpoint(path), strings.Join(reasons, "; "))
+		}
+	}
+	return &StatusError{Method: http.MethodPut, Path: path, Code: resp.StatusCode}
+}
+
+// Edit is a change to many Titles at once through an App's bulk editor. A
+// nil field is left as it is.
+type Edit struct {
+	Monitored        *bool `json:"monitored,omitempty"`
+	QualityProfileID *int  `json:"qualityProfileId,omitempty"`
+}
+
+// EditSeries applies edit to the Series with these IDs in one request.
+func (c *Client) EditSeries(ctx context.Context, ids []int, edit Edit) error {
+	return c.put(ctx, "series/editor", struct {
+		SeriesIDs []int `json:"seriesIds"`
+		Edit
+	}{ids, edit})
+}
+
+// EditMovies applies edit to the Movies with these IDs in one request.
+func (c *Client) EditMovies(ctx context.Context, ids []int, edit Edit) error {
+	return c.put(ctx, "movie/editor", struct {
+		MovieIDs []int `json:"movieIds"`
+		Edit
+	}{ids, edit})
+}
+
 // do sends one authenticated request to path. A body is sent as JSON.
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body io.Reader) (*http.Response, error) {
 	u := c.baseURL + endpoint(path)

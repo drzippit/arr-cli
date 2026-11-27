@@ -208,6 +208,7 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 		cmd.AddCommand(newCalendarCmd(only, flags))
 		cmd.AddCommand(newListCmd(only, flags))
 		cmd.AddCommand(newSearchCmd(inst, flags))
+		cmd.AddCommand(newEditCmd(inst, flags))
 	}
 	switch inst.App {
 	case config.Sonarr:

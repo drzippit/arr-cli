@@ -39,3 +39,23 @@ func huhChoose(in io.Reader, out io.Writer, title string, options []string, sele
 	}
 	return picked, err
 }
+
+// confirmer asks the person at the terminal a yes/no question.
+type confirmer func(question string) (bool, error)
+
+// newConfirmer returns a confirmer that asks through in and out, or nil when
+// either is not a terminal. Tests replace it.
+var newConfirmer = func(in io.Reader, out io.Writer) confirmer {
+	if !isTerminal(in) || !isTerminal(out) {
+		return nil
+	}
+	return func(question string) (bool, error) {
+		var yes bool
+		c := huh.NewConfirm().Title(question).Affirmative("Yes").Negative("No").Value(&yes)
+		err := huh.NewForm(huh.NewGroup(c)).WithInput(in).WithOutput(out).Run()
+		if errors.Is(err, huh.ErrUserAborted) {
+			return false, errCancelled
+		}
+		return yes, err
+	}
+}

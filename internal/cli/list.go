@@ -37,6 +37,10 @@ type libraryRecord struct {
 	sortTitle string
 	// missing says whether the Title is Missing.
 	missing bool
+	// id is the Title's ID in its Instance's Library.
+	id int
+	// qualityProfileID is the ID of the Title's quality profile.
+	qualityProfileID int
 }
 
 // newListCmd builds a list command for the Instances that instances returns:
@@ -89,11 +93,11 @@ func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags)
 	return cmd
 }
 
-// library is one Instance's Library, with the names of its quality profiles,
-// or why it could not be fetched.
+// library is one Instance's Library, with its quality profiles, or why it
+// could not be fetched.
 type library struct {
 	titles   []libraryRecord
-	profiles []string
+	profiles []arrapi.QualityProfile
 	err      error
 }
 
@@ -118,11 +122,10 @@ func fetchLibrary(ctx context.Context, inst config.Instance) library {
 	if err != nil {
 		return library{err: err}
 	}
-	lib := library{}
+	lib := library{profiles: profiles}
 	profileName := map[int]string{}
 	for _, p := range profiles {
 		profileName[p.ID] = p.Name
-		lib.profiles = append(lib.profiles, p.Name)
 	}
 	switch inst.App {
 	case config.Sonarr:
@@ -132,6 +135,7 @@ func fetchLibrary(ctx context.Context, inst config.Instance) library {
 		}
 		for _, s := range series {
 			r := seriesRecord(inst, s)
+			r.id, r.qualityProfileID = s.ID, s.QualityProfileID
 			r.QualityProfile = profileName[s.QualityProfileID]
 			lib.titles = append(lib.titles, r)
 		}
@@ -142,6 +146,7 @@ func fetchLibrary(ctx context.Context, inst config.Instance) library {
 		}
 		for _, m := range movies {
 			r := movieRecord(inst, m)
+			r.id, r.qualityProfileID = m.ID, m.QualityProfileID
 			r.QualityProfile = profileName[m.QualityProfileID]
 			lib.titles = append(lib.titles, r)
 		}
