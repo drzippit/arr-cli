@@ -21,18 +21,18 @@ func TestStampedTagWinsOverBuildInfo(t *testing.T) {
 		t.Errorf("got %+v", got)
 	}
 	if got.String() != "v0.2.0" {
-		t.Errorf("a Release should print as its tag, got %q", got.String())
+		t.Errorf("an arr version should print as its tag, got %q", got.String())
 	}
 }
 
-func TestGoInstallOfATagReportsThatRelease(t *testing.T) {
+func TestGoInstallOfATagReportsThatArrVersion(t *testing.T) {
 	got := resolve("", buildInfo("v0.2.0"))
 	if got.Version != "v0.2.0" || got.Commit != "" || got.Dirty != nil {
 		t.Errorf("got %+v", got)
 	}
 }
 
-func TestPreReleaseTagFromBuildInfoIsARelease(t *testing.T) {
+func TestPreReleaseTagFromBuildInfoIsAnArrVersion(t *testing.T) {
 	if got := resolve("", buildInfo("v0.2.0-rc1")); got.Version != "v0.2.0-rc1" {
 		t.Errorf("got %+v", got)
 	}

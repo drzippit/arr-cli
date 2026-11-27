@@ -12,7 +12,7 @@ import (
 	"github.com/drzippit/arr-cli/internal/config"
 )
 
-func TestVersionFlagPrintsArrsRelease(t *testing.T) {
+func TestVersionFlagPrintsTheArrVersion(t *testing.T) {
 	useConfig(t)
 
 	out, stderr, code := run(t, "--version")
@@ -67,7 +67,7 @@ func TestVersionHasNoShortFlag(t *testing.T) {
 	}
 }
 
-func TestRequestsToInstancesNameArrsRelease(t *testing.T) {
+func TestRequestsToInstancesNameTheArrVersion(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("User-Agent"); got != "arr-cli/dev" {
 			t.Errorf("%s: want User-Agent arr-cli/dev, got %q", r.URL.Path, got)

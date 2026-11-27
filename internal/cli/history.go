@@ -15,7 +15,7 @@ import (
 )
 
 // historyRecord is one finished Download in a Download Client's History,
-// known by its Release, since only a Media App knows the Title it is for.
+// known by its Release's name, since only a Media App knows the Title it is for.
 // Status is completed or failed, and FailMessage says why a failed one
 // failed.
 type historyRecord struct {

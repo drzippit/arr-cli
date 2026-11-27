@@ -21,7 +21,7 @@ import (
 
 // queueRecord is one Download in progress on one Instance. Title is the Series
 // or Movie it is for, which only a Media App knows; a Download Client's own row
-// goes by its Release. Season, Episode and EpisodeTitle are set for Sonarr,
+// goes by the name of its Release. Season, Episode and EpisodeTitle are set for Sonarr,
 // Year for Radarr. Priority, Category and
 // Position (from 1, in queue order) are set for Download Clients; a Download
 // being post-processed has no Position. DownloadClientInstance names the
@@ -362,7 +362,7 @@ func renderQueue(w io.Writer, recs []queueRecord, asJSON bool) error {
 // gives: it is a Download Client's row, or joined to one.
 func (r queueRecord) hasDownloadClientValues() bool { return r.DownloadClientInstance != "" }
 
-// displayTitle is the Title the Download is for, or its Release when no Media
+// displayTitle is the Title the Download is for, or its Release's name when no Media
 // App said, as for one added to a Download Client by hand.
 func (r queueRecord) displayTitle() string {
 	if r.Title == "" {

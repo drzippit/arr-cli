@@ -1,4 +1,4 @@
-// Package release says which Release of arr-cli is running (ADR 0004).
+// Package release says which arr version is running (ADR 0004).
 package release
 
 import (
@@ -7,20 +7,20 @@ import (
 	"sync"
 )
 
-// tag is the Release's tag, stamped in by `make dist` with
+// tag is the arr version's tag, stamped in by `make dist` with
 // -ldflags '-X github.com/drzippit/arr-cli/internal/release.tag=v0.2.0'.
 var tag string
 
 // Info is the running build of arr-cli.
 type Info struct {
-	// Version is the Release's tag, such as v0.2.0, or dev for any other build.
+	// Version is the arr version's tag, such as v0.2.0, or dev for any other build.
 	Version string `json:"version"`
 	// Commit and Dirty come from Go's VCS stamp and are unset without one.
 	Commit string `json:"commit,omitempty"`
 	Dirty  *bool  `json:"dirty,omitempty"`
 }
 
-// String gives the Release's tag, or dev with the commit for any other build,
+// String gives the arr version's tag, or dev with the commit for any other build,
 // as in "dev (52b07aa-dirty)".
 func (i Info) String() string {
 	if i.Version != "dev" || i.Commit == "" {
@@ -40,7 +40,7 @@ var Current = sync.OnceValue(func() Info {
 })
 
 // releaseTag matches a SemVer tag. Build metadata such as +dirty is left out
-// on purpose, so a modified build never passes for a Release.
+// on purpose, so a modified build never passes for an arr version.
 var releaseTag = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 
 // pseudoVersion matches the timestamp-and-commit tail Go gives a build that is
@@ -48,7 +48,7 @@ var releaseTag = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 var pseudoVersion = regexp.MustCompile(`\d{14}-[0-9a-f]{12}$`)
 
 // resolve takes the Version from the stamped tag, else from a module version
-// that is a Release's tag (as with go install …@v0.2.0), else dev.
+// that is an arr version's tag (as with go install …@v0.2.0), else dev.
 func resolve(tag string, bi *debug.BuildInfo) Info {
 	info := Info{Version: "dev"}
 	if bi != nil {

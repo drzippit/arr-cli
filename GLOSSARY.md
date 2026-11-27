@@ -34,9 +34,25 @@ A film tracked by a Radarr Instance.
 All the Titles one Media App Instance tracks.
 _Avoid_: collection, catalogue
 
+**Missing**:
+A monitored Title whose files are not all there: a Movie that is available (by its minimum availability) but has no file, or a Series with an aired, monitored episode that has none. An unmonitored Title, or one not out yet, is never Missing.
+_Avoid_: wanted, incomplete
+
+**Selection**:
+The Titles in one Instance's Library that a command changes all at once, chosen by what you asked for: a query, filters, a list of IDs, or picking them by hand.
+_Avoid_: batch, bulk set, media
+
 **Candidate**:
 A Series or Movie that an App's lookup returns as something that could be added to an Instance. A Candidate may match a Title already in that Instance's Library, and adding a Candidate makes it a Title.
 _Avoid_: result, match, lookup item
+
+**Release**:
+Something an indexer offers to download for a Title, known by its name, such as `Severance.S02E07.1080p.WEB-DL-EXAMPLE`. Grabbing a Release makes it a Download.
+_Avoid_: result, NZB, torrent (for the offer itself)
+
+**Hunt**:
+Asking a Media App to look through its indexers for Releases of the Titles in a Selection, and grab the best ones.
+_Avoid_: search (that finds Candidates), fetch, grab
 
 **Download**:
 One NZB or torrent that a Download Client is fetching or post-processing, or has finished with. The same Download can appear both in a Download Client and in the Media App that grabbed it.
@@ -62,6 +78,6 @@ _Avoid_: health issue, problem
 The version of its App that an Instance reports, such as Sonarr `4.0.11.2680`. arr-cli reads it but never changes it.
 _Avoid_: version (on its own), server version
 
-**Release**:
-A tagged, published build of arr-cli, such as `v0.2.0`. "arr's version" always means the Release you are running.
-_Avoid_: version (on its own), build
+**arr version**:
+A tagged, published build of arr-cli, such as `v0.3.0`. "arr's version" always means the arr version you are running.
+_Avoid_: Release (that is what an indexer offers), build
