@@ -10,7 +10,7 @@ import (
 )
 
 // huntRecord is one Title of a Hunt's Selection, with how its Hunt went:
-// queued when the App took the search, failed when it did not.
+// queued when the App took it, failed when it did not.
 type huntRecord struct {
 	libraryRecord
 	Hunt      string `json:"hunt,omitempty"`
@@ -47,10 +47,7 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				fmt.Fprintln(stderr, "arr: no Titles matched; nothing hunted")
 				return renderHunts(w, recs, flags.json)
 			}
-			if len(sel) > huntCap && !guard.all {
-				return fmt.Errorf("this Hunt covers %s, more than %d; pass --max %d to hunt them all, or narrow the Selection",
-					countTitles(inst.App, len(sel)), huntCap, len(sel))
-			}
+			// A dry run hunts nothing, so it may preview a Selection of any size.
 			if guard.dryRun {
 				if err := renderHunts(w, recs, flags.json); err != nil {
 					return err
@@ -58,8 +55,12 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				fmt.Fprintln(stderr, "arr: dry run; nothing hunted")
 				return nil
 			}
+			if len(sel) > huntCap && !guard.all {
+				return fmt.Errorf("this Hunt covers %s, more than %d; pass --max %d or --all to hunt them all, or narrow the Selection",
+					countTitles(inst.App, len(sel)), huntCap, len(sel))
+			}
 			question := fmt.Sprintf("Hunt for Releases of %s in %s?", countTitles(inst.App, len(sel)), inst.Name)
-			if err := guard.confirm(cmd, question, len(sel)); err != nil {
+			if err := guard.confirm(cmd, question, "this would hunt "+countTitles(inst.App, len(sel))); err != nil {
 				return err
 			}
 			if inst.App == config.Sonarr {
@@ -117,7 +118,7 @@ func renderHunts(w io.Writer, recs []huntRecord, asJSON bool) error {
 		if r.Hunt == "failed" {
 			hunt = "FAILED"
 		}
-		rows[i] = []string{r.Instance, r.displayTitle(), yesNo(r.Monitored), hunt}
+		rows[i] = append(r.libraryRow(), hunt)
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "MONITORED", "HUNT"}, rows)
+	return renderTable(w, append(libraryHeader(), "HUNT"), rows)
 }

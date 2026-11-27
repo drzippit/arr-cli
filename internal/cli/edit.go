@@ -58,6 +58,10 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				return err
 			}
 			ctx, client, lib := cmd.Context(), sel.client, sel.lib
+			// edit shows and sets quality profiles, so it needs them.
+			if lib.profilesErr != nil {
+				return lib.profilesErr
+			}
 			var edit arrapi.Edit
 			if monitorChanged {
 				edit.Monitored = &setMonitored
@@ -86,7 +90,7 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				return nil
 			}
 			question := fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, len(titles)), inst.Name, describeEdit(edit, quality))
-			if err := guard.confirm(cmd, question, len(titles)); err != nil {
+			if err := guard.confirm(cmd, question, "this would change "+countTitles(inst.App, len(titles))); err != nil {
 				return err
 			}
 			ids := make([]int, len(titles))
@@ -130,14 +134,15 @@ func (g selectionGuard) checkSelection(query string, f titleFilter) error {
 }
 
 // confirm asks question in a terminal, unless --yes was given. Without a
-// terminal it refuses, since a script must say --yes (ADR 0006).
-func (g selectionGuard) confirm(cmd *cobra.Command, question string, n int) error {
+// terminal it refuses, since a script must say --yes (ADR 0006); refusal
+// says what the command would do, as in "this would change 2 Movies".
+func (g selectionGuard) confirm(cmd *cobra.Command, question, refusal string) error {
 	if g.yes {
 		return nil
 	}
 	ask := newConfirmer(cmd.InOrStdin(), cmd.OutOrStdout())
 	if ask == nil {
-		return fmt.Errorf("this would change %d Titles; from a script pass --yes, or --dry-run to see what would change", n)
+		return fmt.Errorf("%s; from a script pass --yes, or --dry-run to see it first", refusal)
 	}
 	ok, err := ask(question)
 	if err != nil {
@@ -215,9 +220,9 @@ func renderEdits(w io.Writer, recs []editRecord, asJSON bool) error {
 	}
 	rows := make([][]string, len(recs))
 	for i, r := range recs {
-		rows[i] = []string{r.Instance, r.displayTitle(), yesNo(r.Monitored), orDash(r.QualityProfile), r.displayChanges()}
+		rows[i] = append(r.libraryRow(), r.displayChanges())
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "MONITORED", "QUALITY", "CHANGED"}, rows)
+	return renderTable(w, append(libraryHeader(), "CHANGED"), rows)
 }
 
 // displayChanges lists what changed, as in "quality: HD-720p → HD-1080p".

@@ -79,7 +79,8 @@ func TestHuntStartsOneSeriesSearchPerSeries(t *testing.T) {
 	if len(ids) != 2 || !(ids[0] == 7 && ids[1] == 12 || ids[0] == 12 && ids[1] == 7) {
 		t.Errorf("want one search each for Severance (7) and Shōgun (12), got %v", ids)
 	}
-	for _, want := range []string{"HUNT", "Severance", "Shōgun", "queued"} {
+	// The Selection as list shows it, plus how each Hunt went.
+	for _, want := range []string{"STATUS", "FILES", "HUNT", "Severance", "Shōgun", "continuing", "queued"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -111,7 +112,7 @@ func TestHuntIsCappedAt25TitlesUnlessMaxOrAllSaysOtherwise(t *testing.T) {
 		hunted  int
 		refusal string
 	}{
-		{[]string{"--monitored"}, 0, "30 Series, more than 25"},
+		{[]string{"--monitored"}, 0, "30 Series, more than 25; pass --max 30 or --all"},
 		{[]string{"--monitored", "--max", "29"}, 0, "30 Series, more than 29"},
 		{[]string{"--monitored", "--max", "30"}, 30, ""},
 		{[]string{"--all"}, 30, ""},
@@ -189,7 +190,7 @@ func TestHuntGuardsItsSelection(t *testing.T) {
 		{"old Sonarr", func(t *testing.T) http.Handler {
 			return runningVersion("Sonarr", "3.0.10.1567", recordedHandler(t, "sonarr"))
 		}, []string{"--monitored", "--yes"}, 1, "supports Sonarr 4"},
-		{"from a script", nil, []string{"--monitored"}, 1, "pass --yes, or --dry-run"},
+		{"from a script", nil, []string{"--monitored"}, 1, "this would hunt 2 Series; from a script pass --yes, or --dry-run"},
 		{"whole Library", nil, []string{"--yes"}, 1, "pass --all"},
 		{"dry run", nil, []string{"--monitored", "--dry-run"}, 0, "dry run; nothing hunted"},
 		{"nothing matched", nil, []string{"no such series", "--yes"}, 0, "no Titles matched"},
@@ -222,5 +223,16 @@ func TestHuntInATerminalAsksFirst(t *testing.T) {
 
 	if asked != "Hunt for Releases of 2 Series in sonarr?" || code != 1 || len(*cmds) != 0 {
 		t.Errorf("asked %q, exit code %d, %d searches", asked, code, len(*cmds))
+	}
+}
+
+func TestHuntDryRunPreviewsASelectionOverTheCap(t *testing.T) {
+	srv, cmds := fakeMediaAppForHunt(t, "sonarr", manySeries(t, 30))
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sonarr", "hunt", "--monitored", "--dry-run")
+
+	if code != 0 || len(*cmds) != 0 || !strings.Contains(out, "Series 30") {
+		t.Errorf("exit code %d, %d searches, stderr %q:\n%s", code, len(*cmds), stderr, out)
 	}
 }

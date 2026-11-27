@@ -82,10 +82,16 @@ func (f titleFilter) matches(r libraryRecord) bool {
 }
 
 // checkQuality says why --quality names no quality profile of the Libraries
-// in libs that could be fetched, listing the ones they have.
+// in libs that could be fetched, listing the ones they have. A Library whose
+// profiles could not be fetched counts as failed, since --quality needs them.
 func (f titleFilter) checkQuality(libs []library) error {
 	if f.quality == "" {
 		return nil
+	}
+	for i := range libs {
+		if libs[i].err == nil && libs[i].profilesErr != nil {
+			libs[i].err = libs[i].profilesErr
+		}
 	}
 	var known []string
 	fetched := false
