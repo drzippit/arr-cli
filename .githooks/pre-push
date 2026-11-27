@@ -1,0 +1,23 @@
+#!/bin/sh
+# Refuses a push to main, and a push of a branch not named feat/, fix/ or
+# chore/ plus kebab-case (docs/agents/branching.md). Tags and deleting other
+# branches go through.
+zero=0000000000000000000000000000000000000000
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+	case "$remote_ref" in
+	refs/heads/main)
+		echo "pre-push: main takes changes only through PRs; push a branch and open one" >&2
+		status=1
+		;;
+	refs/heads/*)
+		[ "$local_sha" = "$zero" ] && continue
+		branch=${remote_ref#refs/heads/}
+		if ! echo "$branch" | grep -Eq '^(feat|fix|chore)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+			echo "pre-push: $branch should be feat/, fix/ or chore/ plus kebab-case, as in feat/version-flag" >&2
+			status=1
+		fi
+		;;
+	esac
+done
+exit $status
