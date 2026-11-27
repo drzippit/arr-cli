@@ -197,10 +197,15 @@ func (r statusRecord) displaySpeed() string {
 	if r.Speed == nil {
 		return "-"
 	}
-	if *r.Speed == 0 {
+	return formatSpeed(*r.Speed)
+}
+
+// formatSpeed writes bytes per second in binary units, such as "2.0 MiB/s".
+func formatSpeed(n int64) string {
+	if n <= 0 {
 		return "0 B/s"
 	}
-	return formatSize(*r.Speed) + "/s"
+	return formatSize(n) + "/s"
 }
 
 func (r statusRecord) displayFreeSpace() string {

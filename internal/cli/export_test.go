@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -43,4 +44,13 @@ func SetInstanceForm(t testing.TB, form func(checkName func(string) error) (conf
 	prev := newInstanceForm
 	newInstanceForm = func(io.Reader, io.Writer) instanceForm { return form }
 	t.Cleanup(func() { newInstanceForm = prev })
+}
+
+// SetWatchFrames makes queue --watch draw frames frames, one straight after
+// another, then stop as if Ctrl-C had been pressed, until t ends.
+func SetWatchFrames(t testing.TB, frames int) {
+	prevFrames, prevWait := watchFrames, watchWait
+	watchFrames = frames
+	watchWait = func(context.Context, time.Duration) bool { return true }
+	t.Cleanup(func() { watchFrames, watchWait = prevFrames, prevWait })
 }

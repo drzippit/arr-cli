@@ -3,11 +3,13 @@ package cli
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -58,14 +60,28 @@ type queueRecord struct {
 // (ADR 0005). It only displays the queue; it has no remove, blocklist or
 // retry actions.
 func newQueueCmd(instances func() ([]config.Instance, error), join bool, flags *globalFlags) *cobra.Command {
-	return &cobra.Command{
+	var (
+		watch    bool
+		interval time.Duration
+	)
+	cmd := &cobra.Command{
 		Use:   "queue",
 		Short: "Show downloads in progress on each Instance",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if watch {
+				if err := checkWatch(cmd, interval, flags); err != nil {
+					return err
+				}
+			} else if cmd.Flags().Changed("interval") {
+				return errors.New("--interval needs --watch")
+			}
 			insts, err := instances()
 			if err != nil {
 				return err
+			}
+			if watch {
+				return watchQueue(cmd.Context(), cmd.OutOrStdout(), insts, join, interval)
 			}
 			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchQueue))
 			if join {
@@ -77,16 +93,43 @@ func newQueueCmd(instances func() ([]config.Instance, error), join bool, flags *
 			return reportFailures(cmd.ErrOrStderr(), failures)
 		},
 	}
+	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "keep the queue on screen and refresh it until Ctrl-C")
+	cmd.Flags().DurationVar(&interval, "interval", defaultWatchInterval, "how often --watch refreshes, such as 5s")
+	return cmd
 }
 
 func fetchQueue(ctx context.Context, inst config.Instance) instanceResult[queueRecord] {
+	return fetchQueueAndClient(ctx, inst).queue
+}
+
+// queueAndClient is one Instance's Queue and, for a Download Client, how the
+// client as a whole is doing.
+type queueAndClient struct {
+	queue  instanceResult[queueRecord]
+	client *clientSummary
+}
+
+// clientSummary is how a Download Client as a whole is doing. TimeLeft is a
+// .NET TimeSpan, as in queueRecord.
+type clientSummary struct {
+	instance string
+	state    string
+	speed    int64
+	timeLeft string
+}
+
+func fetchQueueAndClient(ctx context.Context, inst config.Instance) queueAndClient {
 	key, err := inst.ResolveAPIKey()
 	if err != nil {
-		return instanceResult[queueRecord]{err: err}
+		return queueAndClient{queue: instanceResult[queueRecord]{err: err}}
 	}
 	if inst.App.Kind() == config.DownloadClient {
 		return fetchSabnzbdQueue(ctx, inst, sabapi.New(inst.URL, key))
 	}
+	return queueAndClient{queue: fetchMediaAppQueue(ctx, inst, key)}
+}
+
+func fetchMediaAppQueue(ctx context.Context, inst config.Instance, key string) instanceResult[queueRecord] {
 	items, err := arrapi.New(inst.URL, key).Queue(ctx)
 	if err != nil {
 		return instanceResult[queueRecord]{err: err}
@@ -141,14 +184,15 @@ const postProcessingLookback = 100
 
 // fetchSabnzbdQueue gives SABnzbd's Queue: the slots in its queue, in order,
 // then the Downloads in its history it is still post-processing.
-func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi.Client) instanceResult[queueRecord] {
+func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi.Client) queueAndClient {
+	failed := func(err error) queueAndClient { return queueAndClient{queue: instanceResult[queueRecord]{err: err}} }
 	q, err := client.Queue(ctx)
 	if err != nil {
-		return instanceResult[queueRecord]{err: err}
+		return failed(err)
 	}
 	history, err := client.History(ctx, postProcessingLookback, false)
 	if err != nil {
-		return instanceResult[queueRecord]{err: err}
+		return failed(err)
 	}
 	base := queueRecord{
 		Instance: inst.Name, App: inst.App, DownloadClient: inst.App.DisplayName(), Protocol: "usenet",
@@ -177,7 +221,11 @@ func fetchSabnzbdQueue(ctx context.Context, inst config.Instance, client *sabapi
 		r.Status, r.Category = strings.ToLower(h.Status), h.Category
 		recs = append(recs, r)
 	}
-	return instanceResult[queueRecord]{recs: recs}
+	summary := &clientSummary{
+		instance: inst.Name, state: strings.ToLower(q.Status),
+		speed: q.SpeedBytes(), timeLeft: sabnzbdTimeLeft(q.TimeLeft),
+	}
+	return queueAndClient{queue: instanceResult[queueRecord]{recs: recs}, client: summary}
 }
 
 // joinDownloads makes one row of each Download that a Media App and a
@@ -226,17 +274,23 @@ func (r queueRecord) joinedWith(d queueRecord) queueRecord {
 
 // sabnzbdTimeLeft turns SABnzbd's h:mm:ss, or d:hh:mm:ss from a day on, into
 // the .NET TimeSpan the Media Apps give ("00:25:00", "1.02:03:04"), so time
-// left reads the same from every App. It returns "" for no time left and the
-// input when it does not parse.
+// left reads the same from every App. It returns "" for 0:00:00, which
+// SABnzbd gives when it does not know, and the input when it does not parse.
 func sabnzbdTimeLeft(s string) string {
 	parts := strings.Split(s, ":")
 	n := make([]int, len(parts))
+	total := 0
 	for i, p := range parts {
 		v, err := strconv.Atoi(p)
 		if err != nil {
 			return s
 		}
 		n[i] = v
+		total += v
+	}
+	if total == 0 {
+		// SABnzbd says 0:00:00 when it doesn't know, as for a paused Download.
+		return ""
 	}
 	switch len(n) {
 	case 3:
