@@ -197,10 +197,14 @@ func readTitleIDs(r io.Reader, inst config.Instance) ([]int, error) {
 		}
 		ids := make([]int, len(recs))
 		for i, rec := range recs {
-			if rec.Instance != inst.Name {
+			// A record without its Instance, as from jq 'map({tvdbId})', is
+			// taken to be from inst.
+			if rec.Instance != "" && rec.Instance != inst.Name {
 				return nil, fmt.Errorf("stdin has a record from Instance %q, not %s; its IDs mean nothing here", rec.Instance, inst.Name)
 			}
-			ids[i] = cmp.Or(rec.TvdbID, rec.TmdbID)
+			if ids[i] = cmp.Or(rec.TvdbID, rec.TmdbID); ids[i] == 0 {
+				return nil, fmt.Errorf("stdin record %d has no tvdbId or tmdbId", i+1)
+			}
 		}
 		return ids, nil
 	}
@@ -221,10 +225,16 @@ func readTitleIDs(r io.Reader, inst config.Instance) ([]int, error) {
 }
 
 // titlesWithIDs gives the Titles of inst's Library with these TVDB (Sonarr)
-// or TMDB (Radarr) IDs, refusing an ID that is not in it.
+// or TMDB (Radarr) IDs, once each however often an ID is given, refusing an ID
+// that is not in it.
 func titlesWithIDs(inst config.Instance, titles []libraryRecord, ids []int) ([]libraryRecord, error) {
 	var out []libraryRecord
+	seen := map[int]bool{}
 	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
 		i := slices.IndexFunc(titles, func(r libraryRecord) bool { return r.TvdbID == id || r.TmdbID == id })
 		if i < 0 {
 			return nil, fmt.Errorf("no Title with ID %d in %s's Library", id, inst.Name)
