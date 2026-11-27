@@ -1,6 +1,6 @@
 # Vets and tests arr on every PR to main and every push to main, so each PR
 # shows its result and the merged result is tested too. The integration tests
-# stay manual (make integration).
+# run in the Release workflow, and by hand with make integration.
 name: CI
 
 on:

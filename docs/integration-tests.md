@@ -1,6 +1,6 @@
 # Integration tests
 
-The integration tests run arr against real Sonarr and Radarr Instances in Docker. The ordinary tests replay recorded responses, so they cannot notice when an App's API changes; these can. Run them before a release, and when a change touches how arr talks to an App.
+The integration tests run arr against real Sonarr and Radarr Instances in Docker. The ordinary tests replay recorded responses, so they cannot notice when an App's API changes; these can. The Release workflow runs them before publishing, and a failure stops the Release. Run them yourself when a change touches how arr talks to an App.
 
 ## Running them
 

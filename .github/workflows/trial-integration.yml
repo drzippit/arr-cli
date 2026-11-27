@@ -1,0 +1,20 @@
+# TEMPORARY: proves release.yml's integration step on this PR's runner.
+# Deleted before merge.
+name: Trial integration
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Ports in use before
+        run: ss -ltn
+      - name: Integration tests
+        run: time make integration TESTFLAGS=-v

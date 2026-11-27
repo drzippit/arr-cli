@@ -1,4 +1,5 @@
-# Pushing a tag such as v0.1.0 tests arr, builds it for every platform in the
+# Pushing a tag such as v0.1.0 tests arr, including the integration tests
+# against real Sonarr and Radarr, builds it for every platform in the
 # Makefile's PLATFORMS, and publishes a GitHub release of the tag with those
 # archives and their SHA256SUMS. A tag with a hyphen (v0.2.0-rc1) becomes a
 # pre-release. A tag that is not SemVer or not on main, or a build whose
@@ -47,6 +48,11 @@ jobs:
         run: |
           go vet ./...
           go test ./...
+
+      # Real Sonarr and Radarr in Docker, so a Release never goes out without
+      # running against them (docs/integration-tests.md).
+      - name: Integration tests
+        run: make integration
 
       - name: Build
         run: make dist VERSION="$TAG"
