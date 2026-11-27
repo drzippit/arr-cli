@@ -53,31 +53,14 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 			if !monitorChanged && setQuality == "" {
 				return errors.New("pass --set-monitored or --set-quality to say what to change")
 			}
-			query := strings.Join(args, " ")
-			if err := guard.checkSelection(query, filter); err != nil {
-				return err
-			}
-			if err := filter.check([]config.Instance{inst}); err != nil {
-				return err
-			}
-			ctx := cmd.Context()
-			client, err := newMediaAppClient(inst)
+			sel, err := makeSelection(cmd, inst, args, filter, guard)
 			if err != nil {
 				return err
 			}
-			if err := requireSupportedVersion(ctx, inst, client); err != nil {
-				return err
-			}
-			lib := fetchLibrary(ctx, inst)
-			if lib.err != nil {
-				return lib.err
-			}
+			ctx, client, lib := cmd.Context(), sel.client, sel.lib
 			// edit shows and sets quality profiles, so it needs them.
 			if lib.profilesErr != nil {
 				return lib.profilesErr
-			}
-			if err := filter.checkQuality([]library{lib}); err != nil {
-				return err
 			}
 			var edit arrapi.Edit
 			if monitorChanged {
@@ -92,13 +75,13 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				quality = lib.profiles[i]
 				edit.QualityProfileID = &quality.ID
 			}
-			sel := selectTitles(lib.titles, query, filter)
+			titles := sel.titles
 			w, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
-			if len(sel) == 0 {
+			if len(titles) == 0 {
 				fmt.Fprintln(stderr, "arr: no Titles matched; nothing changed")
 				return renderEdits(w, nil, flags.json)
 			}
-			recs := plannedEdits(sel, edit, quality)
+			recs := plannedEdits(titles, edit, quality)
 			if guard.dryRun {
 				if err := renderEdits(w, recs, flags.json); err != nil {
 					return err
@@ -106,12 +89,12 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				fmt.Fprintln(stderr, "arr: dry run; nothing changed")
 				return nil
 			}
-			question := fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, len(sel)), inst.Name, describeEdit(edit, quality))
-			if err := guard.confirm(cmd, question, "this would change "+countTitles(inst.App, len(sel))); err != nil {
+			question := fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, len(titles)), inst.Name, describeEdit(edit, quality))
+			if err := guard.confirm(cmd, question, "this would change "+countTitles(inst.App, len(titles))); err != nil {
 				return err
 			}
-			ids := make([]int, len(sel))
-			for i, r := range sel {
+			ids := make([]int, len(titles))
+			for i, r := range titles {
 				ids[i] = r.id
 			}
 			if inst.App == config.Sonarr {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -17,11 +18,17 @@ import (
 
 // Run executes arr with args and returns the process exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
+	return run(args, os.Stdin, stdout, stderr)
+}
+
+// run is Run reading standard input from stdin.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root, err := newRootCmd(stdout, stderr, args)
 	if err != nil {
 		fmt.Fprintln(stderr, "arr:", err)
 		return 1
 	}
+	root.SetIn(stdin)
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
 		var silent silentError

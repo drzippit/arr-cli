@@ -62,3 +62,8 @@ func SetConfirm(t testing.TB, confirm func(question string) (bool, error)) {
 	newConfirmer = func(io.Reader, io.Writer) confirmer { return confirm }
 	t.Cleanup(func() { newConfirmer = prev })
 }
+
+// RunWithStdin is Run with stdin as standard input.
+func RunWithStdin(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return run(args, stdin, stdout, stderr)
+}

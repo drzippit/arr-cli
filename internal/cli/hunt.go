@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,29 +33,11 @@ func newHuntCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 		Use:   "hunt [query]",
 		Short: "Look through the indexers for Releases of many Titles at once",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			query := strings.Join(args, " ")
-			if err := guard.checkSelection(query, filter); err != nil {
-				return err
-			}
-			if err := filter.check([]config.Instance{inst}); err != nil {
-				return err
-			}
-			ctx := cmd.Context()
-			client, err := newMediaAppClient(inst)
+			s, err := makeSelection(cmd, inst, args, filter, guard)
 			if err != nil {
 				return err
 			}
-			if err := requireSupportedVersion(ctx, inst, client); err != nil {
-				return err
-			}
-			lib := fetchLibrary(ctx, inst)
-			if lib.err != nil {
-				return lib.err
-			}
-			if err := filter.checkQuality([]library{lib}); err != nil {
-				return err
-			}
-			sel := selectTitles(lib.titles, query, filter)
+			ctx, client, sel := cmd.Context(), s.client, s.titles
 			w, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
 			recs := make([]huntRecord, len(sel))
 			for i, r := range sel {

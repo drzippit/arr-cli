@@ -187,6 +187,12 @@ Both `edit` and `hunt` guard against changing more than you meant to (see [ADR 0
 
 When nothing matches, it says so, changes nothing, and exits 0.
 
+For a Selection no filter can express, pass `-` in place of the query and give the TVDB (Sonarr) or TMDB (Radarr) IDs on stdin: one per line, or the JSON `arr list --json` prints for the same Instance. Filters still narrow what comes in. Since stdin is then a pipe, arr can't ask, so `-` needs `--yes` or `--dry-run`:
+
+```sh
+arr sonarr list --json --monitored | jq '[.[] | select(.seasons > 5)]' | arr sonarr edit - --set-quality HD-1080p --yes
+```
+
 `hunt` makes its Selection the same way and asks the App to Hunt each Title, as its own search button does: one command per Series in Sonarr, one for all the Movies in Radarr. Each Title's Hunt counts against your indexers' API limits, so a Hunt over more than 25 Titles is refused unless you pass `--max <n>` or `--all`; `--dry-run` previews it anyway. Its HUNT column (`hunt` in `--json`) says whether the App took each one. If some failed, `hunt` still tries the rest, names the failures on stderr, and exits 1.
 
 ### In scripts
