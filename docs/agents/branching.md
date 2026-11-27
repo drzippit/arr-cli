@@ -34,7 +34,7 @@ git switch main && git pull --ff-only
 
 ## Releases
 
-Tag only commits on `main`. The Release workflow fails a tag that is not on `main`, or that is not SemVer (ADR 0004).
+Tag only commits on `main`. The Release workflow fails a tag that is not on `main`, or that is not SemVer (ADR 0004), and runs the integration tests before publishing.
 
 ## How main is kept locked
 
