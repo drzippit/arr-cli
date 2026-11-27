@@ -1,7 +1,8 @@
 # Pushing a tag such as v0.1.0 tests arr, builds it for every platform in the
 # Makefile's PLATFORMS, and publishes a GitHub release of the tag with those
 # archives and their SHA256SUMS. A tag with a hyphen (v0.2.0-rc1) becomes a
-# pre-release.
+# pre-release. A tag that is not SemVer, or a build whose arr --version does
+# not give the tag, fails before anything is published (ADR 0004).
 name: Release
 
 on:
@@ -21,6 +22,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check the tag
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::$TAG is not vMAJOR.MINOR.PATCH with an optional -prerelease (ADR 0004)"
+            exit 1
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+
       - name: Test
         run: |
           go vet ./...
@@ -28,6 +38,17 @@ jobs:
 
       - name: Build
         run: make dist VERSION="$TAG"
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: Check the stamped version
+        run: |
+          got=$(tar -xzOf "dist/arr_${TAG}_linux_amd64.tar.gz" arr > arr-check && chmod +x arr-check && ./arr-check --version)
+          rm arr-check
+          if [ "$got" != "arr $TAG" ]; then
+            echo "::error::the built arr says '$got', want 'arr $TAG'"
+            exit 1
+          fi
         env:
           TAG: ${{ github.ref_name }}
 

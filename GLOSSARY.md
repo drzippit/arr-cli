@@ -37,3 +37,11 @@ _Avoid_: health item, alert, issue
 **Warning**:
 A Health Check that needs attention, meaning one whose severity is warning or error. Notices are not Warnings.
 _Avoid_: health issue, problem
+
+**App version**:
+The version of its App that an Instance reports, such as Sonarr `4.0.11.2680`. arr-cli reads it but never changes it.
+_Avoid_: version (on its own), server version
+
+**Release**:
+A tagged, published build of arr-cli, such as `v0.2.0`. "arr's version" always means the Release you are running.
+_Avoid_: version (on its own), build
