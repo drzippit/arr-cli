@@ -51,7 +51,7 @@ arr --version
 
 ### With Go
 
-With Go 1.27 or later, this installs the latest Release, which `arr --version` then reports:
+With Go 1.27 or later, this installs the latest arr version, which `arr --version` then reports:
 
 ```sh
 go install github.com/drzippit/arr-cli/cmd/arr@latest
@@ -222,9 +222,9 @@ Completion offers the top-level commands and your Instance names (`arr ra<TAB>`)
 
 ## Versioning
 
-`arr --version` prints the Release you are running (`arr v0.2.0`), or `dev` and the commit for a build that is not one (`arr dev (52b07aa-dirty)`). Add `--json` for `{"version", "commit", "dirty"}`. It works even when the config does not load.
+`arr --version` prints the arr version you are running (`arr v0.3.0`), or `dev` and the commit for a build that is not one (`arr dev (52b07aa-dirty)`). Add `--json` for `{"version", "commit", "dirty"}`. It works even when the config does not load.
 
-Releases follow [SemVer](https://semver.org) over what scripts use: commands and flags, `--json` output, the config file and exit codes. Removing or renaming a JSON field is a breaking change; adding one is not. Tables and other output meant for people can change in any Release. While `arr` is on `0.x`, a minor Release may break things. See [ADR 0004](docs/adr/0004-semver-over-the-scripting-surface.md).
+arr versions follow [SemVer](https://semver.org) over what scripts use: commands and flags, `--json` output, the config file and exit codes. Removing or renaming a JSON field is a breaking change; adding one is not. Tables and other output meant for people can change in any arr version. While `arr` is on `0.x`, a minor arr version may break things. See [ADR 0004](docs/adr/0004-semver-over-the-scripting-surface.md).
 
 ## Development
 

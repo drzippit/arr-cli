@@ -38,7 +38,7 @@ jobs:
       - name: Check the tag is on main
         run: |
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$TAG is not on main; Releases are cut from main only (docs/agents/branching.md)"
+            echo "::error::$TAG is not on main; arr versions are tagged on main only (docs/agents/branching.md)"
             exit 1
           fi
         env:
@@ -49,7 +49,7 @@ jobs:
           go vet ./...
           go test ./...
 
-      # Real Sonarr, Radarr and SABnzbd in Docker, so a Release never goes out without
+      # Real Sonarr, Radarr and SABnzbd in Docker, so an arr version never goes out without
       # running against them (docs/integration-tests.md).
       - name: Integration tests
         run: make integration

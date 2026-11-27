@@ -49,4 +49,4 @@ Helpers in `integration_test.go`:
 - `addNZB(t, inst, name, priority)` uploads a small NZB to SABnzbd under `name` and returns its `nzo_id`.
 - `ensureRootFolder(t, inst, "/movies")` makes a folder a root folder of the Instance unless it already is; `add` needs one.
 
-A test that changes an Instance keeps every step that depends on that change in one test, in order: `TestIntegrationAddThenListMovie` adds The Matrix, lists it, and checks a second add is refused. The `search` and `add` tests go through the App to its metadata service, so they need the internet and fail while that service is down; re-run the Release once it is back.
+A test that changes an Instance keeps every step that depends on that change in one test, in order: `TestIntegrationAddThenListMovie` adds The Matrix, lists it, and checks a second add is refused. The `search` and `add` tests go through the App to its metadata service, so they need the internet and fail while that service is down; re-run the Release workflow once it is back.

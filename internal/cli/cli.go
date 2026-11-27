@@ -57,7 +57,7 @@ var reservedWithoutCommand = []string{"search"}
 // cannot be loaded is an error, except when args ask for shell completion or
 // --version: then the tree has the top-level commands only, so a completion
 // script can still be printed, TAB still offers them, and a broken setup can
-// still say which Release it is.
+// still say which arr version it is.
 func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error) {
 	flags := &globalFlags{}
 	root := &cobra.Command{
@@ -71,7 +71,7 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 	root.PersistentFlags().BoolVar(&flags.json, "json", false, "print JSON instead of a table")
 	// --version is our own flag rather than cobra's, which would also take -v,
 	// the shorthand arr status uses for verbose (ADR 0004).
-	showVersion := root.Flags().Bool("version", false, "print which Release of arr this is")
+	showVersion := root.Flags().Bool("version", false, "print which arr version this is")
 	root.RunE = func(cmd *cobra.Command, _ []string) error {
 		if !*showVersion {
 			return cmd.Help()
