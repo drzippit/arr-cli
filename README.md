@@ -5,20 +5,22 @@
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Sonarr](https://img.shields.io/badge/Sonarr-4%2B-35c5f4)](docs/adr/0003-current-major-app-versions-only.md)
 [![Radarr](https://img.shields.io/badge/Radarr-5%2B-ffc230)](docs/adr/0003-current-major-app-versions-only.md)
+[![SABnzbd](https://img.shields.io/badge/SABnzbd-4%2B-f5c518)](docs/adr/0003-current-major-app-versions-only.md)
 [![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20macOS%20%7C%20windows-lightgrey)](#install)
 
 **Run your self-hosted \*arr media stack from the terminal.**
 
-`arr` talks to every Sonarr and Radarr you run at once. Check that they're all healthy, see what's downloading and what's due this month, search your Libraries, and add new Series and Movies, without opening a single web UI. Every command prints a readable table in a terminal and clean JSON for scripts.
+`arr` talks to every Sonarr, Radarr and SABnzbd you run at once. Check that they're all healthy, see what's downloading and what's due this month, search your Libraries, and add new Series and Movies, without opening a single web UI. Every command prints a readable table in a terminal and clean JSON for scripts.
 
 ```
 $ arr status
-╭──────────┬────────┬───────────┬─────────────┬──────────╮
-│ INSTANCE │ APP    │ REACHABLE │ VERSION     │ WARNINGS │
-├──────────┼────────┼───────────┼─────────────┼──────────┤
-│ sonarr   │ sonarr │ yes       │ 4.0.20.3014 │ 0        │
-│ radarr   │ radarr │ yes       │ 7.0.3.10918 │ 1        │
-╰──────────┴────────┴───────────┴─────────────┴──────────╯
+╭──────────┬─────────┬───────────┬─────────────┬─────────────┬───────────┬───────────┬──────────╮
+│ INSTANCE │ APP     │ REACHABLE │ VERSION     │ STATE       │ SPEED     │ FREE      │ WARNINGS │
+├──────────┼─────────┼───────────┼─────────────┼─────────────┼───────────┼───────────┼──────────┤
+│ sonarr   │ sonarr  │ yes       │ 4.0.20.3014 │ -           │ -         │ -         │ 0        │
+│ radarr   │ radarr  │ yes       │ 7.0.3.10918 │ -           │ -         │ -         │ 1        │
+│ sab      │ sabnzbd │ yes       │ 5.1.3       │ downloading │ 2.0 MiB/s │ 812.5 GiB │ 0        │
+╰──────────┴─────────┴───────────┴─────────────┴─────────────┴───────────┴───────────┴──────────╯
 ```
 
 ## Features
@@ -64,13 +66,13 @@ go build -o arr ./cmd/arr
 
 ## Quick start
 
-1. **Add an Instance.** `arr config add` asks for its name, App, URL and API key (Settings › General in Sonarr or Radarr), checks that it can reach it, and saves it:
+1. **Add an Instance.** `arr config add` asks for its name, App, URL and API key (Settings › General in Sonarr or Radarr, Config › General in SABnzbd), checks that it can reach it, and saves it:
 
    ```sh
    arr config add
    ```
 
-   Repeat for each Sonarr and Radarr you run.
+   Repeat for each Sonarr, Radarr and SABnzbd you run.
 
 2. **Check on everything:**
 
@@ -102,15 +104,21 @@ api_key_cmd = "pass show radarr-4k"   # a command that prints the key, instead o
 quality_profile = "Ultra-HD"     # defaults for arr radarr-4k add
 root_folder = "/movies-4k"
 minimum_availability = "released"
+
+[[instance]]
+name = "sab"
+app = "sabnzbd"
+url = "http://sab.lan:8080"
+api_key_cmd = "pass show sabnzbd"
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `name` | yes | What you call the Instance in commands, as in `arr radarr-4k status`. It can't be the name of a top-level command such as `status` or `config`. |
-| `app` | yes | `sonarr` or `radarr`. |
+| `app` | yes | `sonarr`, `radarr` or `sabnzbd`. |
 | `url` | yes | Where the Instance answers, including any URL base. |
 | `api_key` / `api_key_cmd` | one of them | The API key, or a shell command that prints it (for a password manager). |
-| `quality_profile` | no | Quality profile name `add` uses when you don't pass `--quality`. |
+| `quality_profile` | no | Quality profile name `add` uses when you don't pass `--quality`. This key and the three below are for adding Titles, so a `sabnzbd` Instance can't have them. |
 | `root_folder` | no | Root folder `add` uses when you don't pass `--root`. |
 | `monitor` | no | Sonarr only: which episodes `add` monitors when you don't pass `--monitor`. |
 | `minimum_availability` | no | Radarr only: `announced`, `inCinemas` or `released` (the default). |
@@ -128,8 +136,8 @@ arr radarr-4k status    # just radarr-4k
 
 | Command | What it does |
 | --- | --- |
-| `arr [<instance>] status` | Whether each Instance is reachable, its version, and how many Warnings it reports. `-v` lists each Warning. |
-| `arr [<instance>] queue` | Downloads in progress, with progress and time left. |
+| `arr [<instance>] status` | Whether each Instance is reachable, its version, and how many Warnings it reports. For SABnzbd also whether it is downloading or paused, its speed, and the free space in its download folders. `-v` lists each Warning. |
+| `arr [<instance>] queue` | Downloads in progress in Sonarr and Radarr, with progress and time left. |
 | `arr [<instance>] calendar` | Episodes and Movie releases due this month, as a grid in a wide enough terminal. `--month 2026-12`, `--month next` or `prev` picks another month; `--list` gives a list by date; `--unmonitored` includes unmonitored ones. |
 | `arr [<instance>] list [query]` | The Titles in each Library, optionally only those matching `query`. `--plain` prints one Title per line. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
@@ -138,6 +146,8 @@ arr radarr-4k status    # just radarr-4k
 | `arr config add` | Add an Instance to the config, after checking `arr` can reach it. |
 | `arr config list` | The Instances in the config, with API keys hidden. |
 | `arr completion <shell>` | A completion script for fish, zsh or bash. |
+
+`calendar`, `list`, `search` and `add` are about Titles, so they leave SABnzbd out, and a SABnzbd Instance has only `status` for now.
 
 Every command takes `--json` to print JSON instead of a table, and `--help` for its flags.
 
@@ -177,7 +187,7 @@ Completion offers the top-level commands and your Instance names (`arr ra<TAB>`)
 
 ## Supported App versions
 
-`arr` supports **Sonarr 4 and later** and **Radarr 5 and later**, the current major versions. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
+`arr` supports **Sonarr 4 and later**, **Radarr 5 and later** and **SABnzbd 4 and later**, the current major versions. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
 
 ## Versioning
 
@@ -189,7 +199,7 @@ Releases follow [SemVer](https://semver.org) over what scripts use: commands and
 
 ```sh
 go test ./...          # the unit tests, against recorded API responses
-make integration       # against real Sonarr and Radarr in Docker
+make integration       # against real Sonarr, Radarr and SABnzbd in Docker
 make dist VERSION=dev  # the release archives, into dist/
 ```
 

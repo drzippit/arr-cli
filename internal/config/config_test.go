@@ -89,6 +89,26 @@ func TestLoadRejectsInvalidInstances(t *testing.T) {
 			wantErr: "duplicate",
 		},
 		{
+			name:    "quality profile on a download client",
+			body:    "[[instance]]\nname = \"sab\"\napp = \"sabnzbd\"\nurl = \"http://x\"\napi_key = \"k\"\nquality_profile = \"HD-1080p\"\n",
+			wantErr: `instance "sab": quality_profile is for adding Titles to Sonarr or Radarr`,
+		},
+		{
+			name:    "root folder on a download client",
+			body:    "[[instance]]\nname = \"sab\"\napp = \"sabnzbd\"\nurl = \"http://x\"\napi_key = \"k\"\nroot_folder = \"/tv\"\n",
+			wantErr: "root_folder",
+		},
+		{
+			name:    "monitor on a download client",
+			body:    "[[instance]]\nname = \"sab\"\napp = \"sabnzbd\"\nurl = \"http://x\"\napi_key = \"k\"\nmonitor = \"all\"\n",
+			wantErr: "monitor",
+		},
+		{
+			name:    "minimum availability on a download client",
+			body:    "[[instance]]\nname = \"sab\"\napp = \"sabnzbd\"\nurl = \"http://x\"\napi_key = \"k\"\nminimum_availability = \"released\"\n",
+			wantErr: "minimum_availability",
+		},
+		{
 			name:    "malformed toml",
 			body:    "[[instance]\n",
 			wantErr: "parse",
@@ -104,6 +124,28 @@ func TestLoadRejectsInvalidInstances(t *testing.T) {
 				t.Errorf("error %q does not contain %q", err, tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadReadsSABnzbdInstanceAsDownloadClient(t *testing.T) {
+	path := writeConfig(t, `
+[[instance]]
+name = "sab"
+app = "sabnzbd"
+url = "http://sab.lan:8080"
+api_key = "abc123"
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	inst := cfg.Instances[0]
+	if inst.App != config.Sabnzbd || inst.App.Kind() != config.DownloadClient {
+		t.Errorf("App %q of kind %v, want sabnzbd as a Download Client", inst.App, inst.App.Kind())
+	}
+	if got := inst.App.DisplayName(); got != "SABnzbd" {
+		t.Errorf("DisplayName %q, want SABnzbd", got)
 	}
 }
 

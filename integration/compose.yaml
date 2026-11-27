@@ -1,11 +1,13 @@
-# Sonarr and Radarr for the integration tests; `make integration` starts and
+# Sonarr, Radarr and SABnzbd for the integration tests; `make integration` starts and
 # stops them. See docs/integration-tests.md.
 #
 # Each image is pinned to an exact release so test runs are repeatable. The
 # API keys and ports come from the Makefile; the keys reach the Apps through
 # their environment settings, so the tests know them without reading the
 # Apps' config files. /tv and /movies are empty folders a test can make a root
-# folder. Nothing is kept between runs.
+# folder. SABnzbd takes no API key from its environment, so its service
+# writes one into a new sabnzbd.ini before SABnzbd starts. Nothing is kept
+# between runs.
 
 x-instance: &instance
   environment: &env
@@ -46,3 +48,19 @@ services:
     healthcheck:
       <<: *health
       test: ["CMD-SHELL", "curl -fsS -H \"X-Api-Key: $$RADARR__AUTH__APIKEY\" http://localhost:7878/api/v3/system/status"]
+
+  sabnzbd:
+    <<: *instance
+    image: lscr.io/linuxserver/sabnzbd:5.1.3-ls283
+    environment:
+      <<: *env
+      SABNZBD_API_KEY: ${ARR_IT_SABNZBD_API_KEY:?set by make integration}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - mkdir -p /config && printf '[misc]\napi_key = %s\n' "$$SABNZBD_API_KEY" > /config/sabnzbd.ini && exec /init
+    ports:
+      - "127.0.0.1:${ARR_IT_SABNZBD_PORT:?set by make integration}:8080"
+    healthcheck:
+      <<: *health
+      test: ["CMD-SHELL", "curl -fsS \"http://localhost:8080/api?mode=queue&output=json&apikey=$$SABNZBD_API_KEY\""]

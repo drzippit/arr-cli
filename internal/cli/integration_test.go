@@ -1,6 +1,6 @@
 //go:build integration
 
-// The tests in this file run arr against real Sonarr and Radarr Instances in
+// The tests in this file run arr against real Sonarr, Radarr and SABnzbd Instances in
 // Docker, before a release. `make integration` starts the Instances, runs
 // them and stops the Instances again; see docs/integration-tests.md.
 
@@ -19,6 +19,35 @@ import (
 
 	"github.com/drzippit/arr-cli/internal/config"
 )
+
+func TestIntegrationStatusOfSabnzbd(t *testing.T) {
+	useConfig(t, realInstanceFor(t, "sabnzbd"))
+
+	out, stderr, code := run(t, "sabnzbd", "status", "--json")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	var recs []struct {
+		Reachable bool   `json:"reachable"`
+		Version   string `json:"version"`
+		Supported bool   `json:"supported"`
+		State     string `json:"state"`
+		Speed     *int64 `json:"speed"`
+		FreeSpace *int64 `json:"freeSpace"`
+		Warnings  *int   `json:"warnings"`
+	}
+	if err := json.Unmarshal([]byte(out), &recs); err != nil || len(recs) != 1 {
+		t.Fatalf("want one record: %v\n%s", err, out)
+	}
+	r := recs[0]
+	if !r.Reachable || !r.Supported || !strings.HasPrefix(r.Version, "5.1.") {
+		t.Errorf("want a reachable, supported SABnzbd 5.1:\n%s", out)
+	}
+	if r.State == "" || r.Speed == nil || r.FreeSpace == nil || *r.FreeSpace <= 0 || r.Warnings == nil {
+		t.Errorf("want state, speed, free space and a Warning count:\n%s", out)
+	}
+}
 
 // realInstanceFor returns the Instance of app that `make integration`
 // started, named after its App, from the ARR_IT_<APP>_URL and
@@ -260,6 +289,37 @@ func TestIntegrationConfigAddSavesSonarr(t *testing.T) {
 
 	if code != 0 {
 		t.Fatalf("exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("config after add: %v", err)
+	}
+	if len(cfg.Instances) != 1 || cfg.Instances[0] != want {
+		t.Errorf("Instances %+v, want %+v", cfg.Instances, want)
+	}
+}
+
+func TestIntegrationConfigAddSavesSabnzbdAndRefusesAWrongKey(t *testing.T) {
+	sab := realInstanceFor(t, "sabnzbd")
+	path := useMissingConfig(t)
+	fillForm(t, config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: "wrong"})
+
+	_, stderr, code := run(t, "config", "add")
+
+	if code != 1 || !strings.Contains(stderr, "check the API key") {
+		t.Errorf("a wrong key: exit code %d, stderr %q", code, stderr)
+	}
+
+	want := config.Instance{Name: "sabnzbd", App: config.Sabnzbd, URL: sab.url, APIKey: sab.key}
+	fillForm(t, want)
+
+	out, stderr, code := run(t, "config", "add")
+
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s\n%s", code, stderr, out)
+	}
+	if !strings.Contains(out, "Added sabnzbd (SABnzbd 5.1.") {
+		t.Errorf("want the App and version named:\n%s", out)
 	}
 	cfg, err := config.Load(path)
 	if err != nil {

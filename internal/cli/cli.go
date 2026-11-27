@@ -81,7 +81,7 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 	// name they use is reserved and cannot be taken by an Instance.
 	src := &instanceSource{path: config.Path()}
 	root.AddCommand(newStatusCmd(src.all, flags))
-	root.AddCommand(newQueueCmd(src.all, flags))
+	root.AddCommand(newQueueCmd(src.mediaApps, flags))
 	root.AddCommand(newCalendarCmd(src.mediaApps, flags))
 	root.AddCommand(newListCmd(src.mediaApps, flags))
 	root.AddCommand(newConfigCmd(src, flags))
@@ -159,7 +159,8 @@ func (s *instanceSource) all() ([]config.Instance, error) {
 }
 
 // mediaApps is all, keeping only the Instances of Media Apps, for commands
-// about Titles and Libraries.
+// about Titles and Libraries, and for the queue until it covers Download
+// Clients.
 func (s *instanceSource) mediaApps() ([]config.Instance, error) {
 	insts, err := s.all()
 	if err != nil {
@@ -188,8 +189,8 @@ func newInstanceCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	}
 	only := func() ([]config.Instance, error) { return []config.Instance{inst}, nil }
 	cmd.AddCommand(newStatusCmd(only, flags))
-	cmd.AddCommand(newQueueCmd(only, flags))
 	if inst.App.Kind() == config.MediaApp {
+		cmd.AddCommand(newQueueCmd(only, flags))
 		cmd.AddCommand(newCalendarCmd(only, flags))
 		cmd.AddCommand(newListCmd(only, flags))
 		cmd.AddCommand(newSearchCmd(inst, flags))
