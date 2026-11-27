@@ -1,8 +1,9 @@
 # Pushing a tag such as v0.1.0 tests arr, builds it for every platform in the
 # Makefile's PLATFORMS, and publishes a GitHub release of the tag with those
 # archives and their SHA256SUMS. A tag with a hyphen (v0.2.0-rc1) becomes a
-# pre-release. A tag that is not SemVer, or a build whose arr --version does
-# not give the tag, fails before anything is published (ADR 0004).
+# pre-release. A tag that is not SemVer or not on main, or a build whose
+# arr --version does not give the tag, fails before anything is published
+# (ADR 0004, docs/agents/branching.md).
 name: Release
 
 on:
@@ -17,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -26,6 +29,15 @@ jobs:
         run: |
           if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::$TAG is not vMAJOR.MINOR.PATCH with an optional -prerelease (ADR 0004)"
+            exit 1
+          fi
+        env:
+          TAG: ${{ github.ref_name }}
+
+      - name: Check the tag is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG is not on main; Releases are cut from main only (docs/agents/branching.md)"
             exit 1
           fi
         env:
