@@ -144,6 +144,7 @@ arr radarr-4k status    # just radarr-4k
 | `arr [<instance>] history` | Downloads SABnzbd has finished, newest first, with why a failed one failed. `--failed` shows only failed ones; `--limit 50` shows more than the 20 it shows by default. |
 | `arr <instance> search <query>` | Series or Movies that could be added to that Instance, marking those already in its Library. |
 | `arr <instance> edit [query]` | Change many Titles at once: `--set-monitored=true\|false` and `--set-quality <profile>`. The query and `list`'s filters choose which. See [Changing many Titles](#changing-many-titles). |
+| `arr <instance> hunt [query]` | Ask Sonarr or Radarr to look through its indexers for Releases of many Titles at once, as its own search button does. Unlike `search`, which finds Titles to add, `hunt` looks for something to download. See [Changing many Titles](#changing-many-titles). |
 | `arr <sonarr> add [query]` | Add a Series. See [Adding Titles](#adding-titles). |
 | `arr <radarr> add [query]` | Add a Movie. See [Adding Titles](#adding-titles). |
 | `arr config add` | Add an Instance to the config, after checking `arr` can reach it. |
@@ -173,17 +174,20 @@ In a terminal, `arr` asks for whatever it's missing. From a script it never asks
 arr sonarr list --missing --status ended          # preview: ended Series with episodes missing
 arr sonarr edit --missing --status ended --set-monitored=false
 arr radarr edit --quality HD-1080p --set-quality Ultra-HD --dry-run
+arr radarr hunt --missing                          # look for Releases of every Missing Movie
 ```
 
 `edit` makes its Selection with the same query and filters as `list`, and changes it in one request to the App. `--set-monitored` sets only the Series' or Movie's own flag; a Series' episodes keep theirs. Then it prints each Title with what changed.
 
-It guards against changing more than you meant to (see [ADR 0006](docs/adr/0006-bulk-commands-guard-their-selection.md)):
+Both `edit` and `hunt` guard against changing more than you meant to (see [ADR 0006](docs/adr/0006-bulk-commands-guard-their-selection.md)):
 
-- In a terminal it says what it will change and asks first. From a script it refuses unless you pass `--yes`, or `--dry-run`, which shows the plan and changes nothing.
-- With no query and no filter it would change the whole Library, so you have to pass `--all` for that.
-- It works on one named Instance at a time, and it refuses a Sonarr or Radarr older than arr supports.
+- In a terminal they say what they will do and ask first. From a script they refuse unless you pass `--yes`, or `--dry-run`, which shows the plan and changes nothing.
+- With no query and no filter they would act on the whole Library, so you have to pass `--all` for that.
+- They work on one named Instance at a time, and refuse a Sonarr or Radarr older than arr supports.
 
 When nothing matches, it says so, changes nothing, and exits 0.
+
+`hunt` makes its Selection the same way and asks the App to search for each Title: one search per Series in Sonarr, one for all the Movies in Radarr. Each search counts against your indexers' API limits, so a Hunt over more than 25 Titles is refused unless you pass `--max <n>` or `--all`. Its HUNT column (`hunt` in `--json`) says whether the App took each search. If some failed, `hunt` still tries the rest, names the failures on stderr, and exits 1.
 
 ### In scripts
 

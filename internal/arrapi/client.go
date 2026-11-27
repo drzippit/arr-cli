@@ -238,6 +238,21 @@ func (c *Client) EditMovies(ctx context.Context, ids []int, edit Edit) error {
 	}{ids, edit})
 }
 
+// SearchSeries asks Sonarr to search its indexers for the Series with this
+// ID, as its own search button does: every monitored episode, missing or
+// below the cutoff.
+func (c *Client) SearchSeries(ctx context.Context, id int) error {
+	var started struct{}
+	return c.post(ctx, "command", map[string]any{"name": "SeriesSearch", "seriesId": id}, &started)
+}
+
+// SearchMovies asks Radarr to search its indexers for the Movies with these
+// IDs, in one command.
+func (c *Client) SearchMovies(ctx context.Context, ids []int) error {
+	var started struct{}
+	return c.post(ctx, "command", map[string]any{"name": "MoviesSearch", "movieIds": ids}, &started)
+}
+
 // do sends one authenticated request to path. A body is sent as JSON.
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body io.Reader) (*http.Response, error) {
 	u := c.baseURL + endpoint(path)
