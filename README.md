@@ -1,7 +1,7 @@
 # arr-cli
 
 [![Release](https://github.com/drzippit/arr-cli/actions/workflows/release.yml/badge.svg)](https://github.com/drzippit/arr-cli/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/badge/release-v0.2.1-blue)](https://github.com/drzippit/arr-cli/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/drzippit/arr-cli?sort=semver&label=release)](https://github.com/drzippit/arr-cli/releases/latest)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Sonarr](https://img.shields.io/badge/Sonarr-4%2B-35c5f4)](docs/adr/0003-current-major-app-versions-only.md)
 [![Radarr](https://img.shields.io/badge/Radarr-5%2B-ffc230)](docs/adr/0003-current-major-app-versions-only.md)
