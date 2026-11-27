@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/drzippit/arr-cli/internal/arrapi"
 	"github.com/drzippit/arr-cli/internal/config"
 )
 
@@ -105,4 +106,41 @@ func (f titleFilter) checkQuality(libs []library) error {
 // any reports whether any filter is set.
 func (f titleFilter) any() bool {
 	return f.monitored || f.unmonitored || f.missing || f.status != "" || f.quality != ""
+}
+
+// selection is a Selection in one Instance, with what a bulk command needs to
+// act on it: a client for the Instance and its Library.
+type selection struct {
+	client *arrapi.Client
+	lib    library
+	titles []libraryRecord
+}
+
+// makeSelection makes the Selection of inst that args and filter ask for,
+// after the checks every bulk command makes first: the guard against the
+// whole Library (ADR 0006), the filters, and the App version (ADR 0003).
+func makeSelection(cmd *cobra.Command, inst config.Instance, args []string, filter titleFilter, guard selectionGuard) (selection, error) {
+	query := strings.Join(args, " ")
+	if err := guard.checkSelection(query, filter); err != nil {
+		return selection{}, err
+	}
+	if err := filter.check([]config.Instance{inst}); err != nil {
+		return selection{}, err
+	}
+	ctx := cmd.Context()
+	client, err := newMediaAppClient(inst)
+	if err != nil {
+		return selection{}, err
+	}
+	if err := requireSupportedVersion(ctx, inst, client); err != nil {
+		return selection{}, err
+	}
+	lib := fetchLibrary(ctx, inst)
+	if lib.err != nil {
+		return selection{}, lib.err
+	}
+	if err := filter.checkQuality([]library{lib}); err != nil {
+		return selection{}, err
+	}
+	return selection{client: client, lib: lib, titles: selectTitles(lib.titles, query, filter)}, nil
 }
