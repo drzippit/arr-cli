@@ -45,4 +45,6 @@ The repository is private on GitHub Free, which cannot protect a branch, so the 
 - `make hooks` turns those on for a clone (`git config core.hooksPath .githooks`). Run it once after cloning.
 - `.claude/settings.json` runs `.claude/hooks/guard-git.sh` before each Bash call by Claude Code. It blocks skipping the git hooks and any `git push` that names `main`.
 
+The guard reads a Bash command as plain text, so a PR body or commit message given inline that quotes a blocked command (such as a push to main) trips it. Write such text to a file and pass it with `--body-file` or `git commit -F`.
+
 Never skip the git hooks. If one refuses something that should go through, fix the hook in a `chore/` PR.
