@@ -29,8 +29,11 @@ integration:
 
 # The platforms a release is built for, as GOOS/GOARCH.
 PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
-# The release being built, as its tag; the workflow passes it.
+# The release being built, as its tag; the workflow passes it. It is stamped
+# into arr for arr --version, except dev, which leaves arr to report itself as
+# a dev build (see internal/release).
 VERSION ?= dev
+LDFLAGS = -s -w$(if $(filter-out dev,$(VERSION)), -X github.com/drzippit/arr-cli/internal/release.tag=$(VERSION))
 
 .PHONY: dist
 # Build a static arr for each platform into dist/, each packed on its own as
@@ -44,7 +47,7 @@ dist:
 		name=arr_$(VERSION)_$${os}_$${arch}; \
 		bin=arr; [ "$$os" = windows ] && bin=arr.exe; \
 		mkdir -p dist/$$name; \
-		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags='-s -w' -o dist/$$name/$$bin ./cmd/arr; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags='$(LDFLAGS)' -o dist/$$name/$$bin ./cmd/arr; \
 		if [ "$$os" = windows ]; then \
 			(cd dist/$$name && python3 -m zipfile -c ../$$name.zip $$bin); \
 		else \

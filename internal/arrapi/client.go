@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/drzippit/arr-cli/internal/release"
 )
 
 // Client talks to one Instance.
@@ -194,6 +196,7 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 	req.Header.Set("X-Api-Key", c.apiKey)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "arr-cli/"+release.Current().Version)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

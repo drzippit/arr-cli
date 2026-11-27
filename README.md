@@ -166,9 +166,15 @@ arr completion bash > ~/.local/share/bash-completion/completions/arr
 
 Completion offers the top-level commands and your Instance names (`arr ra<TAB>`), then each Instance's commands (`arr radarr <TAB>`).
 
-## Supported versions
+## Supported App versions
 
 `arr` supports **Sonarr 4 and later** and **Radarr 5 and later**, the current major versions. `arr status` marks an older Instance as unsupported, and commands that change an Instance, such as `add`, refuse to run against one. See [ADR 0003](docs/adr/0003-current-major-app-versions-only.md).
+
+## Versioning
+
+`arr --version` prints the Release you are running (`arr v0.2.0`), or `dev` and the commit for a build that is not one (`arr dev (52b07aa-dirty)`). Add `--json` for `{"version", "commit", "dirty"}`. It works even when the config does not load.
+
+Releases follow [SemVer](https://semver.org) over what scripts use: commands and flags, `--json` output, the config file and exit codes. Removing or renaming a JSON field is a breaking change; adding one is not. Tables and other output meant for people can change in any Release. While `arr` is on `0.x`, a minor Release may break things. See [ADR 0004](docs/adr/0004-semver-over-the-scripting-surface.md).
 
 ## Development
 
@@ -179,5 +185,5 @@ make dist VERSION=dev  # the release archives, into dist/
 ```
 
 - `make integration` needs Docker with Compose; see [docs/integration-tests.md](docs/integration-tests.md).
-- Pushing a `v*` tag (for example `v0.2.0`) builds and publishes a release through [the Release workflow](.github/workflows/release.yml). A tag with a hyphen (`v0.2.0-rc1`) becomes a pre-release.
+- Pushing a `v*` tag (for example `v0.2.0`) builds and publishes a release through [the Release workflow](.github/workflows/release.yml). A tag with a hyphen (`v0.2.0-rc1`) becomes a pre-release, and a tag that is not SemVer fails the workflow.
 - The domain language (App, Instance, Title, Library, Candidate, Warning…) is defined in [GLOSSARY.md](GLOSSARY.md), and design decisions are recorded in [docs/adr](docs/adr).
