@@ -25,17 +25,6 @@ type change struct {
 	To   any `json:"to"`
 }
 
-// selectionGuard holds the flags that guard a Selection (ADR 0006).
-type selectionGuard struct {
-	yes, dryRun, all bool
-}
-
-func (g *selectionGuard) addFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&g.yes, "yes", false, "change the Selection without asking")
-	cmd.Flags().BoolVar(&g.dryRun, "dry-run", false, "show what would change, and change nothing")
-	cmd.Flags().BoolVar(&g.all, "all", false, "make the whole Library the Selection when there is no query or filter")
-}
-
 // newEditCmd builds `arr <instance> edit`, which changes the monitoring and
 // quality profile of a Selection in one request to the App's bulk editor.
 func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
@@ -75,37 +64,29 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 				quality = lib.profiles[i]
 				edit.QualityProfileID = &quality.ID
 			}
-			titles := sel.titles
-			w, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
-			if len(titles) == 0 {
-				fmt.Fprintln(stderr, "arr: no Titles matched; nothing changed")
-				return renderEdits(w, nil, flags.json)
-			}
-			recs := plannedEdits(titles, edit, quality)
-			if guard.dryRun {
-				if err := renderEdits(w, recs, flags.json); err != nil {
-					return err
-				}
-				fmt.Fprintln(stderr, "arr: dry run; nothing changed")
-				return nil
-			}
-			question := fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, len(titles)), inst.Name, describeEdit(edit, quality))
-			if err := guard.confirm(cmd, question, "this would change "+countTitles(inst.App, len(titles))); err != nil {
+			w := cmd.OutOrStdout()
+			titles, err := guard.settle(cmd, inst, sel.titles, bulkAction{
+				verb: "change", done: "changed",
+				pickTitle: "Which to change? All are ticked; untick any to leave out",
+				question: func(n int) string {
+					return fmt.Sprintf("Change %s in %s: %s?", countTitles(inst.App, n), inst.Name, describeEdit(edit, quality))
+				},
+				render: func(titles []libraryRecord) error {
+					return renderEdits(w, plannedEdits(titles, edit, quality), flags.json)
+				},
+			})
+			if err != nil || titles == nil {
 				return err
 			}
-			ids := make([]int, len(titles))
-			for i, r := range titles {
-				ids[i] = r.id
-			}
 			if inst.App == config.Sonarr {
-				err = client.EditSeries(ctx, ids, edit)
+				err = client.EditSeries(ctx, titleIDs(titles), edit)
 			} else {
-				err = client.EditMovies(ctx, ids, edit)
+				err = client.EditMovies(ctx, titleIDs(titles), edit)
 			}
 			if err != nil {
 				return err
 			}
-			return renderEdits(w, recs, flags.json)
+			return renderEdits(w, plannedEdits(titles, edit, quality), flags.json)
 		},
 	}
 	filter.addFlags(cmd)
@@ -113,51 +94,6 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&setMonitored, "set-monitored", false, "monitor (true) or unmonitor (false) the Selection; episodes keep their own setting")
 	cmd.Flags().StringVar(&setQuality, "set-quality", "", "give the Selection this quality profile, by name")
 	return cmd
-}
-
-// newMediaAppClient returns a client for inst, a Media App Instance.
-func newMediaAppClient(inst config.Instance) (*arrapi.Client, error) {
-	key, err := inst.ResolveAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	return arrapi.New(inst.URL, key), nil
-}
-
-// checkSelection refuses to make the whole Library the Selection by
-// accident: with no query and no filter, --all must say so (ADR 0006).
-func (g selectionGuard) checkSelection(query string, f titleFilter) error {
-	if query == "" && !f.any() && !g.all {
-		return errors.New("no query or filter, so this would act on the whole Library; pass --all if that is what you mean")
-	}
-	return nil
-}
-
-// confirm asks question in a terminal, unless --yes was given. Without a
-// terminal it refuses, since a script must say --yes (ADR 0006); refusal
-// says what the command would do, as in "this would change 2 Movies".
-func (g selectionGuard) confirm(cmd *cobra.Command, question, refusal string) error {
-	if g.yes {
-		return nil
-	}
-	ask := newConfirmer(cmd.InOrStdin(), cmd.OutOrStdout())
-	if ask == nil {
-		return fmt.Errorf("%s; from a script pass --yes, or --dry-run to see it first", refusal)
-	}
-	ok, err := ask(question)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errCancelled
-	}
-	return nil
-}
-
-// selectTitles is the Selection: the Titles matching query and filter.
-func selectTitles(titles []libraryRecord, query string, filter titleFilter) []libraryRecord {
-	sel := titlesMatching(slices.Clone(titles), query)
-	return slices.DeleteFunc(sel, func(r libraryRecord) bool { return !filter.matches(r) })
 }
 
 // plannedEdits gives each Title of sel as it will be after edit, with what
@@ -189,18 +125,6 @@ func describeEdit(edit arrapi.Edit, quality arrapi.QualityProfile) string {
 		parts = append(parts, "quality "+quality.Name)
 	}
 	return strings.Join(parts, ", ")
-}
-
-// countTitles says how many Titles of app's kind n is, as in "2 Movies".
-func countTitles(app config.App, n int) string {
-	noun := "Series"
-	if app == config.Radarr {
-		noun = "Movies"
-		if n == 1 {
-			noun = "Movie"
-		}
-	}
-	return fmt.Sprintf("%d %s", n, noun)
 }
 
 func profileNames(profiles []arrapi.QualityProfile) string {

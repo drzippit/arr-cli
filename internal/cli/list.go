@@ -115,11 +115,15 @@ func libraryResults(libs []library) []instanceResult[libraryRecord] {
 // fetchLibrary fetches the Titles in inst's Library, sorted by title, and the
 // names of its quality profiles.
 func fetchLibrary(ctx context.Context, inst config.Instance) library {
-	key, err := inst.ResolveAPIKey()
+	client, err := newMediaAppClient(inst)
 	if err != nil {
 		return library{err: err}
 	}
-	client := arrapi.New(inst.URL, key)
+	return fetchLibraryWith(ctx, inst, client)
+}
+
+// fetchLibraryWith is fetchLibrary through client.
+func fetchLibraryWith(ctx context.Context, inst config.Instance, client *arrapi.Client) library {
 	// Without its quality profiles a Library is still worth showing, so a
 	// failure here is kept for the commands that need the profiles.
 	profiles, profilesErr := client.QualityProfiles(ctx)
