@@ -146,3 +146,34 @@ func TestListFiltersCombineWithEachOtherAndTheQuery(t *testing.T) {
 	out, _, _ = run(t, "list", "matrix", "--monitored", "--quality", "HD-1080p")
 	assertTitles(t, out, []string{"The Matrix"}, "Severance")
 }
+
+// failingQualityProfiles answers the quality profiles with 500 and passes
+// every other request to app's recorded responses.
+func failingQualityProfiles(t *testing.T, app string) http.Handler {
+	t.Helper()
+	recorded := recordedHandler(t, app)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v3/qualityprofile" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		recorded.ServeHTTP(w, r)
+	})
+}
+
+func TestListStillShowsTheLibraryWhenItsQualityProfilesFail(t *testing.T) {
+	srv := httptest.NewServer(failingQualityProfiles(t, "sonarr"))
+	t.Cleanup(srv.Close)
+	useConfig(t, instanceDef{"sonarr", "sonarr", srv.URL, testAPIKey})
+
+	out, stderr, code := run(t, "sonarr", "list")
+	if code != 0 {
+		t.Fatalf("exit code %d, stderr: %s", code, stderr)
+	}
+	assertTitles(t, out, []string{"Shōgun", "Severance", "Twin Peaks"})
+
+	_, stderr, code = run(t, "sonarr", "list", "--quality", "Any")
+	if code != 1 || !strings.Contains(stderr, "qualityprofile") {
+		t.Errorf("--quality needs the profiles: exit code %d, stderr %q", code, stderr)
+	}
+}

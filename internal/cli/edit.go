@@ -72,6 +72,10 @@ func newEditCmd(inst config.Instance, flags *globalFlags) *cobra.Command {
 			if lib.err != nil {
 				return lib.err
 			}
+			// edit shows and sets quality profiles, so it needs them.
+			if lib.profilesErr != nil {
+				return lib.profilesErr
+			}
 			if err := filter.checkQuality([]library{lib}); err != nil {
 				return err
 			}

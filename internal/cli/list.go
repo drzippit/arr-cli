@@ -94,11 +94,13 @@ func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags)
 }
 
 // library is one Instance's Library, with its quality profiles, or why it
-// could not be fetched.
+// could not be fetched. profilesErr is why the profiles could not be fetched;
+// the Titles are still there, without their profile.
 type library struct {
-	titles   []libraryRecord
-	profiles []arrapi.QualityProfile
-	err      error
+	titles      []libraryRecord
+	profiles    []arrapi.QualityProfile
+	profilesErr error
+	err         error
 }
 
 // libraryResults gives the Titles of each library, for gather.
@@ -118,11 +120,10 @@ func fetchLibrary(ctx context.Context, inst config.Instance) library {
 		return library{err: err}
 	}
 	client := arrapi.New(inst.URL, key)
-	profiles, err := client.QualityProfiles(ctx)
-	if err != nil {
-		return library{err: err}
-	}
-	lib := library{profiles: profiles}
+	// Without its quality profiles a Library is still worth showing, so a
+	// failure here is kept for the commands that need the profiles.
+	profiles, profilesErr := client.QualityProfiles(ctx)
+	lib := library{profiles: profiles, profilesErr: profilesErr}
 	profileName := map[int]string{}
 	for _, p := range profiles {
 		profileName[p.ID] = p.Name
