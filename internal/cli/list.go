@@ -31,8 +31,12 @@ type libraryRecord struct {
 	EpisodeFiles *int       `json:"episodeFiles,omitempty"`
 	TmdbID       int        `json:"tmdbId,omitempty"`
 	HasFile      *bool      `json:"hasFile,omitempty"`
+	// QualityProfile is the name of the Title's quality profile.
+	QualityProfile string `json:"qualityProfile,omitempty"`
 
 	sortTitle string
+	// missing says whether the Title is Missing.
+	missing bool
 }
 
 // newListCmd builds a list command for the Instances that instances returns:
@@ -40,7 +44,10 @@ type libraryRecord struct {
 // several words may be quoted or not. --plain prints just the Titles, for
 // sharing a Library as text.
 func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags) *cobra.Command {
-	var plain bool
+	var (
+		plain  bool
+		filter titleFilter
+	)
 	cmd := &cobra.Command{
 		Use:   "list [query]",
 		Short: "Show the Titles in each Instance's Library, optionally only those matching query",
@@ -52,8 +59,16 @@ func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags)
 			if err != nil {
 				return err
 			}
-			recs, failures := gather(insts, forEachInstance(cmd.Context(), insts, fetchLibrary))
+			if err := filter.check(insts); err != nil {
+				return err
+			}
+			libs := forEachInstance(cmd.Context(), insts, fetchLibrary)
+			if err := filter.checkQuality(libs); err != nil {
+				return err
+			}
+			recs, failures := gather(insts, libraryResults(libs))
 			recs = titlesMatching(recs, strings.Join(args, " "))
+			recs = slices.DeleteFunc(recs, func(r libraryRecord) bool { return !filter.matches(r) })
 			w := cmd.OutOrStdout()
 			switch {
 			case flags.json:
@@ -70,36 +85,69 @@ func newListCmd(instances func() ([]config.Instance, error), flags *globalFlags)
 		},
 	}
 	cmd.Flags().BoolVar(&plain, "plain", false, "print one Title per line, without a table")
+	filter.addFlags(cmd)
 	return cmd
 }
 
-func fetchLibrary(ctx context.Context, inst config.Instance) instanceResult[libraryRecord] {
+// library is one Instance's Library, with the names of its quality profiles,
+// or why it could not be fetched.
+type library struct {
+	titles   []libraryRecord
+	profiles []string
+	err      error
+}
+
+// libraryResults gives the Titles of each library, for gather.
+func libraryResults(libs []library) []instanceResult[libraryRecord] {
+	out := make([]instanceResult[libraryRecord], len(libs))
+	for i, l := range libs {
+		out[i] = instanceResult[libraryRecord]{recs: l.titles, err: l.err}
+	}
+	return out
+}
+
+// fetchLibrary fetches the Titles in inst's Library, sorted by title, and the
+// names of its quality profiles.
+func fetchLibrary(ctx context.Context, inst config.Instance) library {
 	key, err := inst.ResolveAPIKey()
 	if err != nil {
-		return instanceResult[libraryRecord]{err: err}
+		return library{err: err}
 	}
 	client := arrapi.New(inst.URL, key)
-	var recs []libraryRecord
+	profiles, err := client.QualityProfiles(ctx)
+	if err != nil {
+		return library{err: err}
+	}
+	lib := library{}
+	profileName := map[int]string{}
+	for _, p := range profiles {
+		profileName[p.ID] = p.Name
+		lib.profiles = append(lib.profiles, p.Name)
+	}
 	switch inst.App {
 	case config.Sonarr:
 		series, err := client.AllSeries(ctx)
 		if err != nil {
-			return instanceResult[libraryRecord]{err: err}
+			return library{err: err}
 		}
 		for _, s := range series {
-			recs = append(recs, seriesRecord(inst, s))
+			r := seriesRecord(inst, s)
+			r.QualityProfile = profileName[s.QualityProfileID]
+			lib.titles = append(lib.titles, r)
 		}
 	case config.Radarr:
 		movies, err := client.Movies(ctx)
 		if err != nil {
-			return instanceResult[libraryRecord]{err: err}
+			return library{err: err}
 		}
 		for _, m := range movies {
-			recs = append(recs, movieRecord(inst, m))
+			r := movieRecord(inst, m)
+			r.QualityProfile = profileName[m.QualityProfileID]
+			lib.titles = append(lib.titles, r)
 		}
 	}
-	slices.SortStableFunc(recs, func(a, b libraryRecord) int { return cmp.Compare(a.sortTitle, b.sortTitle) })
-	return instanceResult[libraryRecord]{recs: recs}
+	slices.SortStableFunc(lib.titles, func(a, b libraryRecord) int { return cmp.Compare(a.sortTitle, b.sortTitle) })
+	return lib
 }
 
 func seriesRecord(inst config.Instance, s arrapi.Series) libraryRecord {
@@ -117,6 +165,9 @@ func seriesRecord(inst config.Instance, s arrapi.Series) libraryRecord {
 		Episodes:     &st.EpisodeCount,
 		EpisodeFiles: &st.EpisodeFileCount,
 		sortTitle:    cmp.Or(s.SortTitle, strings.ToLower(s.Title)),
+		// Sonarr's EpisodeCount counts the aired, monitored episodes and
+		// those with a file.
+		missing: s.Monitored && st.EpisodeFileCount < st.EpisodeCount,
 	}
 }
 
@@ -132,6 +183,7 @@ func movieRecord(inst config.Instance, m arrapi.Movie) libraryRecord {
 		TmdbID:     m.TmdbID,
 		HasFile:    &m.HasFile,
 		sortTitle:  cmp.Or(m.SortTitle, strings.ToLower(m.Title)),
+		missing:    m.Monitored && m.IsAvailable && !m.HasFile,
 	}
 }
 
