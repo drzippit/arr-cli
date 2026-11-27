@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/drzippit/arr-cli/internal/config"
+	"github.com/drzippit/arr-cli/internal/release"
 )
 
 // Run executes arr with args and returns the process exit code.
@@ -46,9 +47,10 @@ type globalFlags struct {
 var reservedWithoutCommand = []string{"search"}
 
 // newRootCmd builds the command tree for running arr with args. A config that
-// cannot be loaded is an error, except when args ask for shell completion:
-// then the tree has the top-level commands only, so a completion script can
-// still be printed and TAB still offers them.
+// cannot be loaded is an error, except when args ask for shell completion or
+// --version: then the tree has the top-level commands only, so a completion
+// script can still be printed, TAB still offers them, and a broken setup can
+// still say which Release it is.
 func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error) {
 	flags := &globalFlags{}
 	root := &cobra.Command{
@@ -60,6 +62,20 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	root.PersistentFlags().BoolVar(&flags.json, "json", false, "print JSON instead of a table")
+	// --version is our own flag rather than cobra's, which would also take -v,
+	// the shorthand arr status uses for verbose (ADR 0004).
+	showVersion := root.Flags().Bool("version", false, "print which Release of arr this is")
+	root.RunE = func(cmd *cobra.Command, _ []string) error {
+		if !*showVersion {
+			return cmd.Help()
+		}
+		info := release.Current()
+		if flags.json {
+			return renderJSONValue(cmd.OutOrStdout(), info)
+		}
+		_, err := fmt.Fprintln(cmd.OutOrStdout(), "arr", info)
+		return err
+	}
 
 	// Top-level commands are registered before the config loads, so every
 	// name they use is reserved and cannot be taken by an Instance.
@@ -79,7 +95,7 @@ func newRootCmd(stdout, stderr io.Writer, args []string) (*cobra.Command, error)
 		root.Long = fmt.Sprintf("No config found at %s; add an Instance with arr config add, or set %s.", src.path, config.EnvVar)
 		src.missing = true
 		return root, nil
-	case err != nil && completing(args):
+	case err != nil && (completing(args) || slices.Contains(args, "--version")):
 		src.loadErr = err
 		return root, nil
 	case err != nil:
@@ -126,7 +142,7 @@ type instanceSource struct {
 	path      string
 	reserved  []string
 	missing   bool
-	loadErr   error // why the config did not load, when completing anyway
+	loadErr   error // why the config did not load, when completing or printing --version anyway
 	instances []config.Instance
 }
 
