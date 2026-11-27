@@ -31,6 +31,25 @@ const (
 // Apps lists every App arr-cli can talk to.
 var Apps = []App{Sonarr, Radarr}
 
+// Kind says what an App does: a Media App tracks a Library of Titles, a
+// Download Client fetches Downloads.
+type Kind int
+
+// The kinds of App.
+const (
+	MediaApp Kind = iota
+	DownloadClient
+)
+
+// kinds gives each App's Kind. Every App in Apps has one.
+var kinds = map[App]Kind{
+	Sonarr: MediaApp,
+	Radarr: MediaApp,
+}
+
+// Kind says whether a is a Media App or a Download Client.
+func (a App) Kind() Kind { return kinds[a] }
+
 // DisplayName is how the App spells its own name, as in "Sonarr".
 func (a App) DisplayName() string {
 	if a == "" {
