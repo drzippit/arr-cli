@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/drzippit/arr-cli/internal/arrapi"
 	"github.com/drzippit/arr-cli/internal/config"
+	"github.com/drzippit/arr-cli/internal/sabapi"
 )
 
 // newConfigCmd builds `arr config`, which manages the Instances in the config
@@ -55,7 +57,7 @@ func newConfigAddCmd(src *instanceSource) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%w; nothing saved", err)
 			}
-			sys, err := arrapi.New(inst.URL, key).SystemStatus(cmd.Context())
+			sys, err := systemStatus(cmd.Context(), inst, key)
 			if err != nil {
 				return fmt.Errorf("cannot reach %s at %s: %w; nothing saved", inst.Name, inst.URL, err)
 			}
@@ -72,6 +74,17 @@ func newConfigAddCmd(src *instanceSource) *cobra.Command {
 			return err
 		},
 	}
+}
+
+// systemStatus asks the Instance which App and version it runs, in a request
+// that needs the API key, so a wrong key is caught too. SABnzbd answers that
+// with its queue; its own version call needs no key.
+func systemStatus(ctx context.Context, inst config.Instance, key string) (arrapi.SystemStatus, error) {
+	if inst.App.Kind() == config.DownloadClient {
+		q, err := sabapi.New(inst.URL, key).Queue(ctx)
+		return arrapi.SystemStatus{AppName: inst.App.DisplayName(), Version: q.Version}, err
+	}
+	return arrapi.New(inst.URL, key).SystemStatus(ctx)
 }
 
 // configRecord is one Instance in the config, without its API key.
@@ -165,7 +178,7 @@ func huhInstanceForm(in io.Reader, out io.Writer, checkName func(string) error) 
 			).Value(&source),
 		),
 		huh.NewGroup(
-			huh.NewInput().Title("API key").Description("Settings › General in the App").
+			huh.NewInput().Title("API key").Description("Settings › General in Sonarr or Radarr, Config › General in SABnzbd").
 				EchoMode(huh.EchoModePassword).Value(&inst.APIKey).Validate(required("API key")),
 		).WithHideFunc(func() bool { return source != keyLiteral }),
 		huh.NewGroup(

@@ -1,0 +1,10 @@
+{
+  "warnings": [
+    {
+      "type": "WARNING",
+      "text": "Too little diskspace forcing PAUSE",
+      "time": 1795776719,
+      "origin": "downloader.py512"
+    }
+  ]
+}

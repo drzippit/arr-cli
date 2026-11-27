@@ -24,12 +24,13 @@ type App string
 
 // The Apps arr-cli can talk to.
 const (
-	Sonarr App = "sonarr"
-	Radarr App = "radarr"
+	Sonarr  App = "sonarr"
+	Radarr  App = "radarr"
+	Sabnzbd App = "sabnzbd"
 )
 
 // Apps lists every App arr-cli can talk to.
-var Apps = []App{Sonarr, Radarr}
+var Apps = []App{Sonarr, Radarr, Sabnzbd}
 
 // Kind says what an App does: a Media App tracks a Library of Titles, a
 // Download Client fetches Downloads.
@@ -43,8 +44,9 @@ const (
 
 // kinds gives each App's Kind. Every App in Apps has one.
 var kinds = map[App]Kind{
-	Sonarr: MediaApp,
-	Radarr: MediaApp,
+	Sonarr:  MediaApp,
+	Radarr:  MediaApp,
+	Sabnzbd: DownloadClient,
 }
 
 // Kind says whether a is a Media App or a Download Client.
@@ -52,8 +54,11 @@ func (a App) Kind() Kind { return kinds[a] }
 
 // DisplayName is how the App spells its own name, as in "Sonarr".
 func (a App) DisplayName() string {
-	if a == "" {
+	switch a {
+	case "":
 		return ""
+	case Sabnzbd:
+		return "SABnzbd"
 	}
 	return strings.ToUpper(string(a[:1])) + string(a[1:])
 }
@@ -167,6 +172,11 @@ func (c *Config) validate(reservedNames []string) error {
 		if inst.URL == "" {
 			return fmt.Errorf("instance %q: missing url", inst.Name)
 		}
+		if inst.App.Kind() == DownloadClient {
+			if key := inst.titleDefault(); key != "" {
+				return fmt.Errorf("instance %q: %s is for adding Titles to Sonarr or Radarr, and %s has none", inst.Name, key, inst.App.DisplayName())
+			}
+		}
 		switch {
 		case inst.APIKey == "" && inst.APIKeyCmd == "":
 			return fmt.Errorf("instance %q: set api_key or api_key_cmd", inst.Name)
@@ -175,6 +185,22 @@ func (c *Config) validate(reservedNames []string) error {
 		}
 	}
 	return nil
+}
+
+// titleDefault names the first config key set on i that is a default for
+// adding Titles, or returns "" when none is.
+func (i Instance) titleDefault() string {
+	for _, f := range []struct{ key, value string }{
+		{"quality_profile", i.QualityProfile},
+		{"root_folder", i.RootFolder},
+		{"monitor", i.Monitor},
+		{"minimum_availability", i.MinimumAvailability},
+	} {
+		if f.value != "" {
+			return f.key
+		}
+	}
+	return ""
 }
 
 // APIKeySource names the config key that gives the Instance's API key:

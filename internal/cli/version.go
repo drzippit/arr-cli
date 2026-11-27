@@ -14,8 +14,9 @@ import (
 // oldestSupported is the first major version of each App that arr-cli
 // supports (ADR 0003).
 var oldestSupported = map[config.App]int{
-	config.Sonarr: 4,
-	config.Radarr: 5,
+	config.Sonarr:  4,
+	config.Radarr:  5,
+	config.Sabnzbd: 4,
 }
 
 // supportedVersion reports whether version of app is one arr-cli supports. A
