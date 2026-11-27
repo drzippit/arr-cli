@@ -212,11 +212,19 @@ func titlesMatching(recs []libraryRecord, query string) []libraryRecord {
 func renderLibrary(w io.Writer, recs []libraryRecord) error {
 	rows := make([][]string, 0, len(recs))
 	for _, r := range recs {
-		rows = append(rows, []string{
-			r.Instance, r.displayTitle(), orDash(r.Status), yesNo(r.Monitored), r.displayFiles(), formatSize(r.SizeOnDisk),
-		})
+		rows = append(rows, r.libraryRow())
 	}
-	return renderTable(w, []string{"INSTANCE", "TITLE", "STATUS", "MONITORED", "FILES", "SIZE"}, rows)
+	return renderTable(w, libraryHeader(), rows)
+}
+
+// libraryHeader and libraryRow are the columns of a Library table, which edit
+// and hunt extend with their own.
+func libraryHeader() []string {
+	return []string{"INSTANCE", "TITLE", "STATUS", "MONITORED", "FILES", "SIZE"}
+}
+
+func (r libraryRecord) libraryRow() []string {
+	return []string{r.Instance, r.displayTitle(), orDash(r.Status), yesNo(r.Monitored), r.displayFiles(), formatSize(r.SizeOnDisk)}
 }
 
 // renderPlainLibrary writes one Title per line. With headed set, each

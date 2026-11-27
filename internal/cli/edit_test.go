@@ -72,7 +72,8 @@ func TestEditSetsTheQualityProfileOfTheSelectionInOneRequest(t *testing.T) {
 		e.QualityProfileID == nil || *e.QualityProfileID != 4 || e.Monitored != nil {
 		t.Errorf("want Shōgun (12) set to HD-1080p (4) and monitoring left alone, got %+v", e)
 	}
-	for _, want := range []string{"Shōgun", "CHANGED", "quality: WEB-2160p → HD-1080p"} {
+	// The Selection as list shows it, plus what changed.
+	for _, want := range []string{"STATUS", "MONITORED", "FILES", "SIZE", "Shōgun", "continuing", "9/10", "CHANGED", "quality: WEB-2160p → HD-1080p"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -118,7 +119,7 @@ func TestEditRefusesWhatItCannotDoBeforeSendingAnything(t *testing.T) {
 	}{
 		{"no change", []string{"shōgun", "--yes"}, "--set-monitored or --set-quality"},
 		{"whole Library without --all", []string{"--set-monitored=false", "--yes"}, "pass --all"},
-		{"from a script without --yes", []string{"shōgun", "--set-monitored=false"}, "pass --yes, or --dry-run"},
+		{"from a script without --yes", []string{"shōgun", "--set-monitored=false"}, "this would change 1 Series; from a script pass --yes, or --dry-run"},
 		{"unknown profile", []string{"shōgun", "--set-quality", "4K", "--yes"}, "Any, HD-1080p, WEB-2160p"},
 		{"unknown filter value", []string{"--status", "released", "--set-monitored=false", "--yes"}, `--status "released"`},
 	}
